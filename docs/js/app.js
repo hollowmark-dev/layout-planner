@@ -142,16 +142,27 @@ function bindToolbar() {
 }
 
 function bindMenus() {
+  const closeAll = () => $$('.menu').forEach((x) => x.classList.remove('open'));
+
   $$('.menu').forEach((m) => {
     const btn = m.querySelector('button');
+    const body = m.querySelector('.menu-body');
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const wasOpen = m.classList.contains('open');
-      $$('.menu').forEach((x) => x.classList.remove('open'));
-      m.classList.toggle('open', !wasOpen);
+      closeAll();
+      if (wasOpen) return;
+      m.classList.add('open');
+      // ツールバーの overflow に切り取られないよう、画面基準で置き直す
+      const r = btn.getBoundingClientRect();
+      const w = body.offsetWidth || 200;
+      body.style.top = `${Math.round(r.bottom + 4)}px`;
+      body.style.left = `${Math.round(Math.min(r.left, window.innerWidth - w - 8))}px`;
     });
   });
-  document.addEventListener('click', () => $$('.menu').forEach((m) => m.classList.remove('open')));
+  document.addEventListener('click', closeAll);
+  window.addEventListener('resize', closeAll);
+  $('#toolbar').addEventListener('scroll', closeAll);
 
   $$('[data-save]').forEach((b) => b.addEventListener('click', () => saveProject(b.dataset.save)));
   $$('[data-export]').forEach((b) => b.addEventListener('click', () => {

@@ -48,10 +48,13 @@ input,select{font:inherit; color:inherit}
 
 /* メニュー */
 .menu{position:relative}
+/* ツールバーは横スクロールするので overflow がかかっている。
+   その中に absolute で置くと、下に開くメニューが切り取られて見えなくなる。
+   画面基準（fixed）にして、位置は開くときにJSで入れる */
 .menu-body{
-  display:none; position:absolute; top:32px; left:0; min-width:200px; padding:4px;
+  display:none; position:fixed; min-width:200px; padding:4px;
   background:#fff; border:1px solid var(--line); border-radius:7px;
-  box-shadow:0 8px 24px rgba(16,24,40,.14); z-index:40;
+  box-shadow:0 8px 24px rgba(16,24,40,.14); z-index:60;
 }
 .menu.open .menu-body{display:block}
 .menu-body button{display:block; width:100%; text-align:left; border:0!important; background:none!important; height:30px!important}
