@@ -8,7 +8,7 @@ import {
 } from '../state.js';
 import { fmtMm, fmtLen } from '../geom.js';
 import {
-  stage, mainLayer, overlayLayer, pointer, screenToMm, pxPerMmScreen,
+  stage, mainLayer, overlayLayer, pointer, screenToMm,
 } from './stage.js';
 import { snapPoint, snapToItems } from './snap.js';
 import { showHint, hideHint, openModal, el, toast } from '../ui/dom.js';

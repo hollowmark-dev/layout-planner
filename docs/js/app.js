@@ -15,7 +15,7 @@ import {
 } from './canvas/stage.js';
 import { initItems, syncItems } from './canvas/items.js';
 import { initAnnot, syncNotes, isPicking, cancelPicking, clearMeasure } from './canvas/annot.js';
-import { initPalette, consumePending, cancelPending, hasPending } from './ui/palette.js';
+import { initPalette, consumePending, cancelPending } from './ui/palette.js';
 import { initInspector } from './ui/inspector.js';
 import { initLayers } from './ui/layers.js';
 import { initCheck } from './check/aisle.js';

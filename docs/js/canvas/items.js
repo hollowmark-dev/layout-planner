@@ -10,7 +10,7 @@
 import {
   state, bus, plan, items, layerById, commit, setSelection, toggleSelection, clearSelection,
 } from '../state.js';
-import { itemAabb, corners, fmtMm } from '../geom.js';
+import { itemAabb, corners } from '../geom.js';
 import {
   stage, mainLayer, overlayLayer, bgLayer, pxPerMmScreen, screenToMm, pointer,
   isSpaceDown,
@@ -216,8 +216,6 @@ export function syncItems() {
   bus.emit('items:rendered');
 }
 
-export function nodeFor(id) { return nodes.get(id) || null; }
-
 /** 他プランを薄く重ねて表示する（A案とB案のずれを見る用） */
 function syncGhost() {
   ghostGroup.destroyChildren();
@@ -254,7 +252,7 @@ function refreshTransformer() {
   overlayLayer.batchDraw();
 }
 
-export function repaintSelection() {
+function repaintSelection() {
   for (const [id, g] of nodes) {
     const it = items().find((i) => i.id === id);
     if (it) paint(g, it, state.selection.has(id));
@@ -480,27 +478,3 @@ export function initItems() {
     overlayLayer.batchDraw();
   });
 }
-
-/** 什器を1つ選んで画面に見せる（チェック結果からのジャンプ用） */
-export function flash(id) {
-  const g = nodes.get(id);
-  if (!g) return;
-  const ring = new Konva.Rect({
-    x: g.x() - 100, y: g.y() - 100, width: 200, height: 200,
-    stroke: '#dc2626', strokeWidth: 3, strokeScaleEnabled: false, listening: false,
-  });
-  const b = itemAabb(items().find((i) => i.id === id));
-  ring.setAttrs({
-    x: b.minX - 60, y: b.minY - 60, width: b.w + 120, height: b.h + 120,
-  });
-  overlayLayer.add(ring);
-  overlayLayer.batchDraw();
-  setTimeout(() => { ring.destroy(); overlayLayer.batchDraw(); }, 1200);
-}
-
-/** 選択中の什器の情報（プロパティ欄・数量表で使う） */
-export function describe(it) {
-  return `${it.name}（W${fmtMm(it.w)}×D${fmtMm(it.d)}）`;
-}
-
-export { corners };

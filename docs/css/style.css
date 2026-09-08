@@ -18,17 +18,22 @@ input,select{font:inherit; color:inherit}
 
 /* ── ツールバー ─────────────────────── */
 #toolbar{
-  height:var(--head); display:flex; align-items:center; gap:14px; padding:0 12px;
+  height:var(--head); display:flex; align-items:center; gap:10px; padding:0 8px;
   background:var(--panel); border-bottom:1px solid var(--line); position:relative; z-index:30;
+  /* 幅の狭い画面ではツールバー自身が横スクロールする。
+     ここで受け止めないと、ページ全体が横にずれて図面の位置がおかしくなる */
+  overflow-x:auto; overflow-y:hidden; scrollbar-width:thin;
 }
+#toolbar::-webkit-scrollbar{height:4px}
+#toolbar > *{flex:none}
 .brand{font-weight:700; letter-spacing:.02em; white-space:nowrap}
-.tb-group{display:flex; align-items:center; gap:6px}
-.tb-group::before{content:""; width:1px; height:20px; background:var(--line); margin-right:6px}
+.tb-group{display:flex; align-items:center; gap:4px}
+.tb-group::before{content:""; width:1px; height:20px; background:var(--line); margin-right:4px; flex:none}
 .tb-right{margin-left:auto}
 .tb-right::before{display:none}
 #toolbar button{
-  height:28px; padding:0 10px; border:1px solid var(--line); border-radius:5px;
-  background:#fff; white-space:nowrap;
+  height:28px; padding:0 8px; border:1px solid var(--line); border-radius:5px;
+  background:#fff; white-space:nowrap; flex:none;
 }
 #toolbar button:hover:not(:disabled){background:#f6f7f9; border-color:#c3c9d2}
 #toolbar button:disabled{opacity:.4; cursor:default}
@@ -203,3 +208,13 @@ kbd{
 .help-table{width:100%; border-collapse:collapse; font-size:12px}
 .help-table td{padding:3px 0; vertical-align:top}
 .help-table td:first-child{width:110px; white-space:nowrap}
+
+/* ── 幅の狭い画面向け ─────────────────────────────── */
+@media (max-width:1280px){
+  .brand{display:none}
+  :root{--pane:216px; --side:268px}
+}
+@media (max-width:1100px){
+  :root{--pane:200px; --side:250px}
+  #toolbar{gap:8px}
+}

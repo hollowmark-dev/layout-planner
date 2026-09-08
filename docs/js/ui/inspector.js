@@ -7,10 +7,10 @@
  */
 
 import {
-  state, bus, commit, touch, selectedItems, selectedNotes, findElement, layerById,
+  state, bus, commit, touch, selectedItems, selectedNotes,
 } from '../state.js';
 import { fmtMm } from '../geom.js';
-import { $, el, toast } from './dom.js';
+import { $, el } from './dom.js';
 import {
   deleteSelection, duplicateSelection, rotateSelection, alignSelection,
   distributeSelection, setLayerForSelection,
