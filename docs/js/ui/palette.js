@@ -7,6 +7,7 @@ import {
   state, uid, items, commit, setSelection, hasScale,
 } from '../state.js';
 import { $, el, openModal, toast, numberField, textField, showHint, hideHint } from './dom.js';
+import { baseName } from '../geom.js';
 import { stage } from '../canvas/stage.js';
 import { snapPosition } from '../canvas/snap.js';
 
@@ -72,8 +73,11 @@ export function renderPalette() {
         title: `${t.name}\nW${t.w} × D${t.d}${t.h ? ` × H${t.h}` : ''} mm\nドラッグして図面に置く`,
       }, [
         swatch,
-        el('span', { class: 'nm', text: t.name }),
-        el('span', { class: 'dim', text: `${t.w}×${t.d}` }),
+        el('span', { class: 'body' }, [
+          el('span', { class: 'nm', text: baseName(t.name) }),
+          // W×D だけだと、高さ違い（書庫のH1050とH1752など）が見分けられない
+          el('span', { class: 'dim', text: `${t.w}×${t.d}${t.h ? ` H${t.h}` : ''}` }),
+        ]),
         cat.name === MY_CAT
           ? el('button', { class: 'del', title: '削除', text: '×', onClick: (e) => { e.stopPropagation(); removeMyTemplate(t.id); } })
           : null,

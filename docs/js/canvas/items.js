@@ -10,7 +10,7 @@
 import {
   state, bus, plan, items, layerById, commit, setSelection, toggleSelection, clearSelection,
 } from '../state.js';
-import { itemAabb, corners } from '../geom.js';
+import { itemAabb, corners, baseName, clamp } from '../geom.js';
 import {
   stage, mainLayer, overlayLayer, bgLayer, pxPerMmScreen, screenToMm, pointer,
   isSpaceDown,
@@ -118,8 +118,9 @@ function paint(node, it, selected) {
     a.strokeWidth(1);
     a.strokeScaleEnabled(false);
   });
-  const label = node.findOne('.label');
-  if (label) label.fill(shade(base, -0.62));
+  const ink = shade(base, -0.62);
+  node.find('.label').forEach((t) => t.fill(ink));
+  node.find('.labeldim').forEach((t) => t.fill(ink));
 }
 
 function withAlpha(hex, a) {
@@ -149,28 +150,72 @@ function buildNode(it) {
   return g;
 }
 
+const FONT = '"Yu Gothic UI","Meiryo",sans-serif';
+const measureCtx = document.createElement('canvas').getContext('2d');
+
+function textWidth(text, size) {
+  measureCtx.font = size + 'px ' + FONT;
+  return measureCtx.measureText(text).width;
+}
+
+/**
+ * 名前と寸法を2行に分けて置く。
+ * 枠に収まるところまで文字を小さくし、それでも入らなければ寸法の行を落とす。
+ * 1行に詰め込んで折り返すと「平机 1000×」「700」のように読めなくなるため。
+ */
+function labelNodes(it) {
+  const main = it.label || baseName(it.name);
+  const dim = it.w + '×' + it.d;
+  const boxW = it.w * 0.9;
+  const boxH = it.d * 0.86;
+  const LH = 1.15;
+
+  // 文字の大きさは什器の寸法だけで決める。名前の長さで変えると、
+  // 同じ大きさの書庫が隣り合ったときに文字サイズがばらついて落ち着かない。
+  // 幅に入りきらない名前は縮めずに省略する（縮めると読めなくなって消える）
+  let size = clamp(Math.min(it.w, it.d) * 0.22, 90, 200);
+  if (size * LH > boxH) size = boxH / LH;
+
+  const dimSize = size * 0.78;
+  const showDim = state.project.settings.showItemDims !== false
+    && size * LH + dimSize * LH <= boxH
+    && textWidth(dim, dimSize) <= boxW;
+
+  const totalH = showDim ? size * LH + dimSize * LH : size * LH;
+  let y = -totalH / 2;
+
+  const line = (name, text, fs, opacity) => {
+    const node = new Konva.Text({
+      name,
+      text,
+      fontSize: fs,
+      fontFamily: FONT,
+      align: 'center',
+      verticalAlign: 'middle',
+      width: it.w,
+      height: fs * LH,
+      x: -it.w / 2,
+      y,
+      opacity,
+      listening: false,
+      wrap: 'none',
+      ellipsis: true,
+    });
+    y += fs * LH;
+    return node;
+  };
+
+  const nodes = [line('label', main, size, 1)];
+  if (showDim) nodes.push(line('labeldim', dim, dimSize, 0.72));
+  return nodes;
+}
+
 function rebuildChildren(g, it) {
   g.destroyChildren();
   shapeFor(it).forEach((s) => g.add(s));
-  const text = it.label || it.name;
-  const size = Math.max(90, Math.min(it.d * 0.26, 220));
-  g.add(new Konva.Text({
-    name: 'label',
-    text,
-    fontSize: size,
-    fontFamily: 'Yu Gothic UI, Meiryo, sans-serif',
-    align: 'center',
-    verticalAlign: 'middle',
-    width: it.w * 0.94,
-    height: it.d,
-    x: -it.w * 0.47,
-    y: -it.d / 2,
-    listening: false,
-    wrap: 'char',
-    ellipsis: true,
-  }));
+  labelNodes(it).forEach((n) => g.add(n));
   paint(g, it, state.selection.has(it.id));
-  updateLabelVisibility(g, it);
+  updateLabelVisibility(g);
 }
 
 function updateNode(g, it) {
@@ -185,11 +230,12 @@ function updateNode(g, it) {
   rebuildChildren(g, it);
 }
 
-function updateLabelVisibility(g, it) {
-  const label = g.findOne('.label');
-  if (!label) return;
-  // 画面上で 7px 未満になる文字は読めないので消す（引きで見たとき図が汚れる）
-  label.visible(label.fontSize() * pxPerMmScreen() >= 7);
+function updateLabelVisibility(g) {
+  // 画面上で小さすぎる文字は読めないうえに図を汚すので消す。
+  // 引いていくと、まず寸法の行が消え、次に名前が消える
+  const s = pxPerMmScreen();
+  g.find('.label').forEach((t) => t.visible(t.fontSize() * s >= 7));
+  g.find('.labeldim').forEach((t) => t.visible(t.fontSize() * s >= 8));
 }
 
 /* ── 同期 ───────────────────────────────────────────── */
@@ -464,7 +510,7 @@ export function initItems() {
   bus.on('view:changed', () => {
     for (const [id, g] of nodes) {
       const it = items().find((i) => i.id === id);
-      if (it) updateLabelVisibility(g, it);
+      if (it) updateLabelVisibility(g);
     }
     mainLayer.batchDraw();
   });

@@ -140,6 +140,15 @@ export function fmtLen(mm) {
   return `${fmtMm(mm)}mm`;
 }
 
+/**
+ * 什器名から末尾の寸法表記を落とす。「平机 1400×700」→「平机」。
+ * 寸法は名前とは別に出すので、名前の側では邪魔になる。
+ */
+export function baseName(name) {
+  const s = String(name || '').replace(/(?:^|[\s　])(?:[φΦ]?\d+(?:\s*[×xX]\s*\d+)?)\s*$/, '').trim();
+  return s || String(name || '');
+}
+
 export function snapTo(v, step) {
   if (!step) return v;
   return Math.round(v / step) * step;

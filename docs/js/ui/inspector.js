@@ -53,13 +53,19 @@ function renderSettings(root) {
       touch(['settings:changed', 'notes:changed']);
     }, { min: 20, step: 10 }),
   );
-  const chk = el('input', { type: 'checkbox' });
-  chk.checked = !!st.colorByLayer;
-  chk.addEventListener('change', () => {
-    st.colorByLayer = chk.checked;
-    touch(['items:changed']);
-  });
-  root.append(el('label', { class: 'chk', style: 'margin-top:6px' }, [chk, 'レイヤーの色で表示する']));
+  const toggle = (label, key, def = false) => {
+    const chk = el('input', { type: 'checkbox' });
+    chk.checked = st[key] === undefined ? def : !!st[key];
+    chk.addEventListener('change', () => {
+      st[key] = chk.checked;
+      touch(['items:changed']);
+    });
+    return el('label', { class: 'chk', style: 'margin-top:6px' }, [chk, label]);
+  };
+  root.append(
+    toggle('什器に寸法を表示する', 'showItemDims', true),
+    toggle('レイヤーの色で表示する', 'colorByLayer'),
+  );
 }
 
 /* ── 什器1点 ────────────────────────────────────────── */

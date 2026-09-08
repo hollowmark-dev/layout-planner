@@ -5,11 +5,8 @@
       "name": "layout-planner",
       "runtimeExecutable": "python",
       "runtimeArgs": [
-        "-m",
-        "http.server",
-        "8031",
-        "--directory",
-        "docs"
+        "tools/serve.py",
+        "8031"
       ],
       "port": 8031
     }

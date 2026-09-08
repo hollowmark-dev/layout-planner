@@ -71,6 +71,7 @@ export function newProject(name = '無題のレイアウト') {
       aisleMinMm: 800,
       textMm: 200,
       showGhost: false,
+      showItemDims: true,
     },
   };
 }

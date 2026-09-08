@@ -12,6 +12,7 @@ import {
 import { fmtMm } from './geom.js';
 import {
   initStage, stage, zoomToFit, zoomBy, pointer, redrawGrid, pxPerMmScreen, isTypingTarget,
+  refreshBackground,
 } from './canvas/stage.js';
 import { initItems, syncItems } from './canvas/items.js';
 import { initAnnot, syncNotes, isPicking, cancelPicking, clearMeasure } from './canvas/annot.js';
@@ -320,6 +321,8 @@ $('.brand')?.addEventListener('click', renameProject);
  */
 window.layoutPlanner = {
   state, bus, buildPdf, contentRegion, exportPng, exportCsv,
+  // 状態を直接いじったあとに画面へ反映させるためのもの
+  refreshBackground, zoomToFit, redraw: () => { syncItems(); syncNotes(); },
 };
 
 main().catch((e) => {
