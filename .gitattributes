@@ -1,0 +1,10 @@
+# 改行はLFで統一する（同じファイルがWindows/Macで別物にならないように）
+* text=auto eol=lf
+
+# バイナリ扱い。改行変換されるとPDFのxrefがずれて壊れる
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary

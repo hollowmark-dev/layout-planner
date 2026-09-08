@@ -1,0 +1,9 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# 業務図面・作業中のプロジェクトファイルは公開リポジトリに入れない
+*.layout.json
+*.layout-lite.json
+/private/
