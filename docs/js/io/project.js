@@ -11,11 +11,11 @@
  */
 
 import {
-  state, bus, loadProject, newProject, PROJECT_VERSION,
+  state, bus, loadProject, newProject, commit, PROJECT_VERSION,
 } from '../state.js';
 import { loadImage } from '../pdfload.js';
 import { refreshBackground, zoomToFit } from '../canvas/stage.js';
-import { toast, confirmModal, openModal, el } from '../ui/dom.js';
+import { toast, confirmModal, openModal, openBusy, el } from '../ui/dom.js';
 
 const AUTOSAVE_KEY = 'layout-planner.autosave.v1';
 
@@ -32,18 +32,40 @@ function download(text, filename) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+/**
+ * 背景を保存用の画像データにする。
+ * 読み込み直後はキャンバスのまま持っているので、ここで初めて画像化する
+ * （読み込みのたびに数秒かかっていたのを、保存するときだけに移した）。
+ */
+export function backgroundDataUrl() {
+  const bg = state.background;
+  if (bg.dataUrl) return bg.dataUrl;
+  const src = bg.image;
+  if (!src || typeof src.toDataURL !== 'function') return null;
+  // 線画はPNGのほうが線が潰れない。大きすぎるときだけJPEGに落とす
+  let url = src.toDataURL('image/png');
+  if (url.length > 12 * 1024 * 1024) url = src.toDataURL('image/jpeg', 0.88);
+  bg.dataUrl = url;
+  return url;
+}
+
 export function serialize(includeImage) {
   const p = JSON.parse(JSON.stringify(state.project));
   p.version = PROJECT_VERSION;
   p.savedAt = new Date().toISOString();
-  if (includeImage && state.background.dataUrl) {
-    p.drawing.imageDataUrl = state.background.dataUrl;
+  if (includeImage) {
+    const url = backgroundDataUrl();
+    if (url) p.drawing.imageDataUrl = url;
   }
   return JSON.stringify(p);
 }
 
 export function saveProject(mode = 'full') {
+  const busy = mode === 'full' && !state.background.dataUrl && state.background.image
+    ? openBusy('保存の準備をしています', '図面を画像にしています…')
+    : null;
   const json = serialize(mode === 'full');
+  busy?.close();
   const mb = json.length / 1024 / 1024;
   const suffix = mode === 'full' ? '.layout.json' : '.layout-lite.json';
   download(json, safeName(state.project.name) + suffix);
@@ -127,8 +149,9 @@ export function applyPdf(r, fileName) {
   refreshBackground();
   zoomToFit();
   document.getElementById('stage-wrap').classList.add('has-drawing');
-  bus.emit('drawing:changed');
-  bus.emit('project:dirty');
+  // 履歴に積んでおかないと、読み込み直後のUndoで図面情報だけが消え、
+  // 背景は前の縮尺のまま残って較正がずれる
+  commit(['drawing:changed']);
   return keepScale;
 }
 
@@ -142,7 +165,7 @@ function autosave() {
     delete p.drawing.imageDataUrl;
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
       at: Date.now(),
-      hasDrawing: !!state.background.dataUrl,
+      hasDrawing: !!state.background.image,
       project: p,
     }));
   } catch (e) {

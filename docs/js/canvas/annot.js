@@ -248,6 +248,7 @@ export function syncNotes() {
     if (state.selection.has(nt.id)) {
       g.add(new Konva.Rect({
         ...g.getClientRect({ relativeTo: g }),
+        name: 'selmark',
         stroke: '#1d4ed8', strokeWidth: 1.5, dash: [6, 4], strokeScaleEnabled: false, listening: false,
       }));
     }
@@ -400,7 +401,6 @@ export function initAnnot() {
 
   bus.on('project:loaded', syncNotes);
   bus.on('notes:changed', syncNotes);
-  bus.on('items:changed', syncNotes);
   bus.on('selection:changed', syncNotes);
   bus.on('layers:changed', syncNotes);
   bus.on('plan:changed', syncNotes);

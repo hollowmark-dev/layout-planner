@@ -10,6 +10,7 @@ import { $, el, openModal, toast, numberField, textField, showHint, hideHint } f
 import { baseName } from '../geom.js';
 import { stage } from '../canvas/stage.js';
 import { snapPosition } from '../canvas/snap.js';
+import { pickPoints } from '../canvas/annot.js';
 
 const STORE_KEY = 'layout-planner.templates.v1';
 const MY_CAT = 'マイ什器';
@@ -82,11 +83,16 @@ export function renderPalette() {
           ? el('button', { class: 'del', title: '削除', text: '×', onClick: (e) => { e.stopPropagation(); removeMyTemplate(t.id); } })
           : null,
       ]);
-      row.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', JSON.stringify(t));
-        e.dataTransfer.effectAllowed = 'copy';
-      });
-      row.addEventListener('click', () => startClickPlace(t));
+      if (t.tool === 'wall') {
+        row.setAttribute('draggable', 'false');
+        row.addEventListener('click', () => startWallTool());
+      } else {
+        row.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', JSON.stringify(t));
+          e.dataTransfer.effectAllowed = 'copy';
+        });
+        row.addEventListener('click', () => startClickPlace(t));
+      }
       details.append(row);
     }
     root.append(details);
@@ -110,6 +116,8 @@ function templateToItem(t, x, y) {
     h: t.h || 0,
     shape: t.shape || 'rect',
     color: t.color || '#93c5fd',
+    // 障害物（壁・柱）は数量表と面積の集計に入れない
+    kind: t.kind || 'furniture',
     x: Math.round(x),
     y: Math.round(y),
     rot: 0,
@@ -161,6 +169,47 @@ export function cancelPending() {
 }
 
 export function hasPending() { return !!pending; }
+
+/* ── 壁を引く ───────────────────────────────────────── */
+
+/**
+ * 2点をクリックして壁を1枚置く。図面の壁をなぞっておくと、
+ * 「什器と壁の隙間」を通路チェックで見られるようになる。
+ */
+async function startWallTool() {
+  if (!hasScale()) {
+    toast('先に「縮尺較正」で図面の縮尺を決めてください。', 'err');
+    return;
+  }
+  const th = state.project.settings.wallThicknessMm || 100;
+  const pts = await pickPoints(2, {
+    hint: (i) => (i === 0 ? '壁の<b>始点</b>をクリック（Escで中止）' : '壁の<b>終点</b>をクリック'),
+  });
+  if (!pts) return;
+  const [a, b] = pts;
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (len < th) { toast('短すぎます。', 'err'); return; }
+  const item = {
+    id: uid('it'),
+    templateId: 'obs-wall',
+    name: `壁 ${Math.round(len)}`,
+    label: '',
+    w: Math.round(len),
+    d: th,
+    h: 0,
+    shape: 'rect',
+    color: '#9ca3af',
+    kind: 'obstacle',
+    x: Math.round((a.x + b.x) / 2),
+    y: Math.round((a.y + b.y) / 2),
+    rot: Math.round((Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI * 10) / 10,
+    layerId: state.currentLayerId,
+  };
+  items().push(item);
+  commit(['items:changed']);
+  setSelection([item.id]);
+  startWallTool(); // 続けて引けるようにする
+}
 
 /* ── 自社什器 ───────────────────────────────────────── */
 

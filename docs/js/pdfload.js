@@ -40,7 +40,8 @@ export async function openPdf(file) {
  * @returns {Promise<{dataUrl:string, image:HTMLImageElement, width:number, height:number,
  *                    pageWidthMm:number, pageHeightMm:number}>}
  */
-export async function renderPage(pdf, pageNumber) {
+export async function renderPage(pdf, pageNumber, onStep = () => {}) {
+  onStep('ページを解析しています…');
   const page = await pdf.getPage(pageNumber);
   const base = page.getViewport({ scale: 1 });
   const scale = Math.min(6, Math.max(1, TARGET_LONG_SIDE / Math.max(base.width, base.height)));
@@ -53,15 +54,14 @@ export async function renderPage(pdf, pageNumber) {
   // 図面は白地が前提。透明のままだとPNG化・PDF書き出しで背景が抜ける
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  onStep('図面を描画しています…');
   await page.render({ canvasContext: ctx, viewport }).promise;
 
-  // 線画は PNG のほうが線が潰れない。大きすぎるときだけ JPEG に落とす
-  let dataUrl = canvas.toDataURL('image/png');
-  if (dataUrl.length > 12 * 1024 * 1024) dataUrl = canvas.toDataURL('image/jpeg', 0.88);
-
+  // ここで PNG 化すると数秒かかるので、画像化は保存するときまで先送りする。
+  // Konva はキャンバスをそのまま背景に使える
   return {
-    dataUrl,
-    image: await loadImage(dataUrl),
+    image: canvas,
+    dataUrl: null,
     width: canvas.width,
     height: canvas.height,
     pageWidthMm: base.width * PT_TO_MM,
@@ -91,9 +91,10 @@ async function pickPage(pdf) {
  * ファイル選択から背景画像までを一気に。
  * @returns {Promise<null | {pageIndex:number, ...renderPage の戻り値}>}
  */
-export async function loadPdfAsBackground(file) {
+export async function loadPdfAsBackground(file, onStep = () => {}) {
   let pdf;
   try {
+    onStep('PDFを読み込んでいます…');
     pdf = await openPdf(file);
   } catch (e) {
     toast('PDFを読み込めませんでした。ファイルが壊れているか、パスワード付きの可能性があります。', 'err');
@@ -104,7 +105,7 @@ export async function loadPdfAsBackground(file) {
   if (!pageNumber) return null;
 
   try {
-    const rendered = await renderPage(pdf, pageNumber);
+    const rendered = await renderPage(pdf, pageNumber, onStep);
     return { pageIndex: pageNumber - 1, ...rendered };
   } catch (e) {
     toast('ページを描画できませんでした。', 'err');

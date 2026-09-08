@@ -29,24 +29,68 @@ export function deleteSelection() {
   commit(['items:changed', 'notes:changed', 'selection:changed']);
 }
 
-export function duplicateSelection(offset = 300) {
+/** 選択している要素をまとめた外形（配列複製のピッチの既定値に使う） */
+export function selectionBounds() {
+  const its = selectedItems().filter(editable);
+  if (!its.length) return null;
+  let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
+  for (const it of its) {
+    const b = itemAabb(it);
+    minX = Math.min(minX, b.minX); minY = Math.min(minY, b.minY);
+    maxX = Math.max(maxX, b.maxX); maxY = Math.max(maxY, b.maxY);
+  }
+  return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
+}
+
+function offsetCopy(e, dx, dy) {
+  const copy = { ...e, id: uid(e.type ? 'n' : 'it') };
+  if (e.type === 'dim') {
+    copy.x1 += dx; copy.y1 += dy; copy.x2 += dx; copy.y2 += dy;
+    notes().push(copy);
+  } else if (e.type === 'text') {
+    copy.x += dx; copy.y += dy;
+    notes().push(copy);
+  } else {
+    copy.x += dx; copy.y += dy;
+    items().push(copy);
+  }
+  return copy.id;
+}
+
+/**
+ * 選んだものを行×列に並べて複製する。机を何十台も置くときに、
+ * 複製とドラッグを繰り返さずに済むようにするためのもの。
+ */
+export function arrayDuplicate({ cols, rows, pitchX, pitchY }) {
   const sel = selectedAll();
   if (!sel.length) return;
-  const newIds = [];
-  for (const e of sel) {
-    const copy = { ...e, id: uid(e.type ? 'n' : 'it') };
-    if (e.type === 'dim') {
-      copy.x1 += offset; copy.y1 += offset; copy.x2 += offset; copy.y2 += offset;
-      notes().push(copy);
-    } else if (e.type === 'text') {
-      copy.x += offset; copy.y += offset;
-      notes().push(copy);
-    } else {
-      copy.x += offset; copy.y += offset;
-      items().push(copy);
-    }
-    newIds.push(copy.id);
+  const nc = Math.max(1, Math.round(cols));
+  const nr = Math.max(1, Math.round(rows));
+  if (nc * nr <= 1) return;
+  if (nc * nr * sel.length > 2000) {
+    toast('一度に作る数が多すぎます。2,000点以内にしてください。', 'err');
+    return;
   }
+  const ids = sel.map((e) => e.id);
+  for (let r = 0; r < nr; r += 1) {
+    for (let c = 0; c < nc; c += 1) {
+      if (r === 0 && c === 0) continue;
+      for (const e of sel) ids.push(offsetCopy(e, c * pitchX, r * pitchY));
+    }
+  }
+  commit(['items:changed', 'notes:changed']);
+  setSelection(ids);
+  toast(`${nc} × ${nr} に複製しました（${ids.length}点）`);
+}
+
+export function duplicateSelection(offset = null) {
+  const sel = selectedAll();
+  if (!sel.length) return;
+  // 既定は「選択している幅のぶんだけ右へ」。Ctrl+D を続けて押すと横一列になる
+  const b = selectionBounds();
+  const dx = offset !== null ? offset : (b ? b.w : 300);
+  const dy = offset !== null ? offset : 0;
+  const newIds = sel.map((e) => offsetCopy(e, dx, dy));
   commit(['items:changed', 'notes:changed']);
   setSelection(newIds);
 }

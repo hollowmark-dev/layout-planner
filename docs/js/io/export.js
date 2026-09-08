@@ -63,7 +63,32 @@ export function contentRegion(marginMm = 300, itemsOnly = false) {
  * 指定範囲を、指定解像度でキャンバスに描く。
  * 画面の表示状態を壊さないよう、使い捨ての Stage を作って複製したレイヤーを描く。
  */
-function renderRegion(region, pxPerMmOut, { grid = false } = {}) {
+/**
+ * 画面用の一時的な見た目を落とす。
+ * ここを掃除しないと、そのときのズームや選択状態がそのまま印刷物に出てしまう
+ * （引いて表示していると什器名が消える、選択中の青枠が印刷される、など）。
+ */
+function stripScreenState(bg, main, { grid, ghost }) {
+  const gridShape = bg.findOne('.grid');
+  if (grid && gridShape) gridShape.setAttr('force', true);
+  else if (gridShape) gridShape.destroy();
+
+  if (!ghost) bg.find('.ghost').forEach((n) => n.destroy());
+
+  // 画面倍率で隠していた文字を出す
+  const showDim = state.project.settings.showItemDims !== false;
+  main.find('.label').forEach((t) => t.visible(true));
+  main.find('.labeldim').forEach((t) => t.visible(showDim));
+
+  // 選択の強調を通常の見た目に戻す
+  main.find('.body').forEach((b) => {
+    const normal = b.getAttr('normalStroke');
+    if (normal) { b.stroke(normal); b.strokeWidth(1.2); }
+  });
+  main.find('.selmark').forEach((n) => n.destroy());
+}
+
+function renderRegion(region, pxPerMmOut, { grid = false, ghost = false } = {}) {
   const holder = document.createElement('div');
   holder.style.cssText = 'position:fixed;left:-99999px;top:0;';
   document.body.append(holder);
@@ -76,8 +101,8 @@ function renderRegion(region, pxPerMmOut, { grid = false } = {}) {
 
   const bg = bgLayer.clone();
   const main = mainLayer.clone();
-  if (!grid) bg.find('.grid').forEach((n) => n.destroy());
   s.add(bg, main);
+  stripScreenState(bg, main, { grid, ghost });
   s.draw();
 
   const canvas = s.toCanvas({ pixelRatio: 1 });
@@ -92,7 +117,7 @@ export function exportPng() {
   const region = contentRegion();
   // 長辺 4000px 前後を目安に
   const pxPerMmOut = Math.min(0.6, Math.max(0.02, 4000 / Math.max(region.w, region.h)));
-  const src = renderRegion(region, pxPerMmOut);
+  const src = renderRegion(region, pxPerMmOut, { ghost: state.project.settings.showGhost });
 
   const out = document.createElement('canvas');
   out.width = src.width;
@@ -159,7 +184,8 @@ export function openPdfDialog() {
     info.innerHTML = `縮尺 <b>1 : ${s}</b> で出力します。`
       + `<br>図面は用紙上で ${usedW.toFixed(0)} × ${usedH.toFixed(0)} mm。`
       + `作図範囲は ${area.w.toFixed(0)} × ${area.h.toFixed(0)} mm。`
-      + (fits ? '' : '<br><span style="color:var(--danger)">この縮尺では用紙に収まりません。</span>');
+      + (fits ? '' : '<br><span style="color:var(--danger)">この縮尺では用紙に収まりません。'
+        + 'はみ出す分は切り取られます（縮尺は保たれます）。</span>');
   };
   [paperSel, scaleSel, rangeSel].forEach((s) => s.addEventListener('change', updateInfo));
   updateInfo();
@@ -188,6 +214,18 @@ export function openPdfDialog() {
       toast(`PDFを書き出しました（${built.paper.name} / 1:${built.scale}）`);
     },
   });
+}
+
+/** 指定縮尺で用紙に載る範囲だけを、中央合わせで切り出す */
+function cropToPaper(region, area, S) {
+  const w = Math.min(region.w, area.w * S);
+  const h = Math.min(region.h, area.h * S);
+  return {
+    x: region.x + (region.w - w) / 2,
+    y: region.y + (region.h - h) / 2,
+    w,
+    h,
+  };
 }
 
 function drawArea(paper) {
@@ -219,13 +257,15 @@ export function buildPdf({ paper, scaleInput, dpi = 300, grid = false, region = 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
-  // 図面
-  const src = renderRegion(region, pxPerRealMm, { grid });
-  const drawW = region.w / S;   // 用紙上のmm
-  const drawH = region.h / S;
+  // 図面。用紙に収まらないときは縮めずに範囲を切り取る。
+  // 縮めて押し込むと、図枠には「1:100」と出るのに紙の上の寸法が合わなくなる
+  const fit = cropToPaper(region, area, S);
+  const src = renderRegion(fit, pxPerRealMm, { grid, ghost: state.project.settings.showGhost });
+  const drawW = fit.w / S;   // 用紙上のmm
+  const drawH = fit.h / S;
   const offX = (MARGIN + Math.max(0, (area.w - drawW) / 2)) * pxPerPaperMm;
   const offY = (MARGIN + Math.max(0, (area.h - drawH) / 2)) * pxPerPaperMm;
-  ctx.drawImage(src, offX, offY, Math.min(drawW, area.w) * pxPerPaperMm, Math.min(drawH, area.h) * pxPerPaperMm);
+  ctx.drawImage(src, offX, offY, drawW * pxPerPaperMm, drawH * pxPerPaperMm);
 
   drawFrame(ctx, paper, pxPerPaperMm, S);
 
@@ -317,7 +357,8 @@ function drawScaleBar(ctx, k, S, x, y) {
 export function exportCsv() {
   const rows = [];
   const map = new Map();
-  for (const it of items()) {
+  // 壁・柱は什器ではないので数量表に入れない
+  for (const it of items().filter((i) => i.kind !== 'obstacle')) {
     const key = `${it.name}|${it.w}|${it.d}|${it.h}|${it.layerId}`;
     const cur = map.get(key);
     if (cur) cur.count += 1;

@@ -520,6 +520,79 @@
       ]
     },
     {
+      "name": "障害物（壁・柱）",
+      "color": "#9ca3af",
+      "note": "通路チェックの相手にはなるが、数量表と面積の集計には入らないもの。図面の壁や柱をなぞっておくと、什器と壁の隙間を測れる。",
+      "items": [
+        {
+          "id": "obs-wall-tool",
+          "name": "壁を引く（2点指定）",
+          "w": 2000,
+          "d": 100,
+          "h": 0,
+          "color": "#9ca3af",
+          "kind": "obstacle",
+          "tool": "wall"
+        },
+        {
+          "id": "obs-wall-2000",
+          "name": "壁 2000×100",
+          "w": 2000,
+          "d": 100,
+          "h": 0,
+          "color": "#9ca3af",
+          "kind": "obstacle"
+        },
+        {
+          "id": "obs-wall-4000",
+          "name": "壁 4000×100",
+          "w": 4000,
+          "d": 100,
+          "h": 0,
+          "color": "#9ca3af",
+          "kind": "obstacle"
+        },
+        {
+          "id": "obs-col-600",
+          "name": "柱 600×600",
+          "w": 600,
+          "d": 600,
+          "h": 0,
+          "color": "#9ca3af",
+          "kind": "obstacle"
+        },
+        {
+          "id": "obs-col-800",
+          "name": "柱 800×800",
+          "w": 800,
+          "d": 800,
+          "h": 0,
+          "color": "#9ca3af",
+          "kind": "obstacle"
+        },
+        {
+          "id": "obs-pillar-round",
+          "name": "丸柱 φ600",
+          "w": 600,
+          "d": 600,
+          "h": 0,
+          "color": "#9ca3af",
+          "kind": "obstacle",
+          "shape": "ellipse"
+        },
+        {
+          "id": "obs-door-900",
+          "name": "扉の開き 900",
+          "w": 900,
+          "d": 900,
+          "h": 0,
+          "color": "#9ca3af",
+          "kind": "obstacle",
+          "shape": "ellipse"
+        }
+      ]
+    },
+    {
       "name": "図形",
       "color": "#cbd5e1",
       "items": [

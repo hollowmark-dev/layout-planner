@@ -30,7 +30,7 @@ import {
   deleteSelection, duplicateSelection, rotateSelection, nudge,
   copySelection, pasteClipboard, selectAllInPlan,
 } from './actions.js';
-import { $, $$, el, toast, openModal, confirmModal } from './ui/dom.js';
+import { $, $$, el, toast, openModal, openBusy, confirmModal } from './ui/dom.js';
 
 /* ── 起動 ───────────────────────────────────────────── */
 
@@ -163,8 +163,15 @@ function bindMenus() {
 }
 
 async function openPdfFile(file) {
-  toast('PDFを読み込んでいます…');
-  const r = await loadPdfAsBackground(file);
+  // 図面によっては描画に数秒かかる。何も出さないと固まったように見えて
+  // もう一度「PDFを開く」を押されてしまう
+  const busy = openBusy('図面を読み込んでいます', 'PDFを読み込んでいます…');
+  let r;
+  try {
+    r = await loadPdfAsBackground(file, (msg) => busy.update(msg));
+  } finally {
+    busy.close();
+  }
   if (!r) return;
   const keptScale = applyPdf(r, file.name);
   if (keptScale) {
@@ -221,7 +228,9 @@ function bindKeys() {
 
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelection(); return; }
 
-    const step = e.shiftKey ? 100 : (state.project.settings.gridMm || 10);
+    // Shiftは「10目盛ぶん」。100mm固定だと既定グリッドと同じで意味がなかった
+    const grid = state.project.settings.gridMm || 10;
+    const step = e.shiftKey ? grid * 10 : grid;
     const moves = {
       ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
     };
@@ -286,7 +295,7 @@ function showHelp() {
   const keys = [
     ['V / M / D / T', '選択／計測／寸法線／文字'],
     ['R', '90度回転（Shift＋Rで逆回り）'],
-    ['方向キー', 'グリッド1目盛ずつ移動（Shiftで100mm）'],
+    ['方向キー', 'グリッド1目盛ずつ移動（Shiftで10目盛）'],
     ['Ctrl+Z / Ctrl+Y', '元に戻す／やり直し'],
     ['Ctrl+C / Ctrl+V', 'コピー／貼り付け'],
     ['Ctrl+D', '複製'],

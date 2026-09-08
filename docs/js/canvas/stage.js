@@ -42,6 +42,8 @@ export function initStage(containerEl) {
 
   bindWheel();
   bindPan();
+  // Undo や読み込みで project が入れ替わったら、背景も新しい縮尺で置き直す
+  bus.on('project:loaded', refreshBackground);
 
   const ro = new ResizeObserver(() => {
     stage.size({ width: containerEl.clientWidth, height: containerEl.clientHeight });
@@ -71,15 +73,20 @@ export function toWorld(pos) {
 /** 画面上の一定サイズを mm に換算する（線の当たり判定などに使う） */
 export const screenToMm = (px) => px / stage.scaleX();
 
-/** いま見えている範囲を mm で */
-export function visibleRect() {
-  const s = stage.scaleX();
+/** 指定したStageに見えている範囲を mm で。書き出し用のStageにも使う */
+export function visibleRectOf(stg) {
+  const s = stg.scaleX();
   return {
-    x: -stage.x() / s,
-    y: -stage.y() / s,
-    w: stage.width() / s,
-    h: stage.height() / s,
+    x: -stg.x() / s,
+    y: -stg.y() / s,
+    w: stg.width() / s,
+    h: stg.height() / s,
   };
+}
+
+/** いま画面に見えている範囲を mm で */
+export function visibleRect() {
+  return visibleRectOf(stage);
 }
 
 function applyScale(next, anchorScreen) {
@@ -138,11 +145,16 @@ export function refreshBackground() {
   const d = state.project.drawing;
   const img = state.background.image;
   bgImageNode.image(img || null);
+  // Undoで「PDFを開く前」まで戻ったときに、図面だけ残らないようにする
+  const shown = !!img && !!d.imgW;
+  bgImageNode.visible(shown);
+  document.getElementById('stage-wrap')?.classList.toggle('has-drawing', shown);
   if (img) {
     // 画像1px を 1/pxPerMm mm として配置する。未較正なら 1px=1mm の仮置き
     const k = d.pxPerMm ? 1 / d.pxPerMm : 1;
     bgImageNode.scale({ x: k, y: k });
-    bgImageNode.size({ width: img.naturalWidth, height: img.naturalHeight });
+    // 背景は <img> のこともキャンバスのこともある（読み込み直後はキャンバス）
+    bgImageNode.size({ width: d.imgW || img.width, height: d.imgH || img.height });
   }
   bgLayer.batchDraw();
 }
@@ -151,24 +163,28 @@ export function refreshBackground() {
 
 function drawGrid(ctx, shape) {
   const st = state.project.settings;
-  if (!st.snapGrid && !state.project.drawing.pxPerMm) return;
+  // force は書き出し用。画面では「グリッド」のチェックに従う
+  if (!shape.getAttr('force') && !st.snapGrid) return;
+  const stg = shape.getStage();
+  if (!stg) return;
   const step = st.gridMm;
   if (!step) return;
 
-  const s = stage.scaleX();
+  const s = stg.scaleX();
   // 画面上で細かすぎるグリッドは描かない（見えないうえに重い）
   let stepMm = step;
   while (stepMm * s < 7) stepMm *= 5;
   if (stepMm * s > 400) return;
 
-  const v = visibleRect();
-  const x0 = Math.floor(v.x / stepMm) * stepMm;
-  const y0 = Math.floor(v.y / stepMm) * stepMm;
+  const v = visibleRectOf(stg);
+  const org = st.gridOrigin || { x: 0, y: 0 };
+  const x0 = Math.floor((v.x - org.x) / stepMm) * stepMm + org.x;
+  const y0 = Math.floor((v.y - org.y) / stepMm) * stepMm + org.y;
   const majorEvery = 10; // 太線の間隔
 
   ctx.save();
   for (let x = x0; x <= v.x + v.w; x += stepMm) {
-    const major = Math.round(x / stepMm) % majorEvery === 0;
+    const major = Math.round((x - org.x) / stepMm) % majorEvery === 0;
     ctx.beginPath();
     ctx.moveTo(x, v.y);
     ctx.lineTo(x, v.y + v.h);
@@ -177,7 +193,7 @@ function drawGrid(ctx, shape) {
     ctx.stroke();
   }
   for (let y = y0; y <= v.y + v.h; y += stepMm) {
-    const major = Math.round(y / stepMm) % majorEvery === 0;
+    const major = Math.round((y - org.y) / stepMm) % majorEvery === 0;
     ctx.beginPath();
     ctx.moveTo(v.x, y);
     ctx.lineTo(v.x + v.w, y);

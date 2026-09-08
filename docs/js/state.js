@@ -72,6 +72,9 @@ export function newProject(name = '無題のレイアウト') {
       textMm: 200,
       showGhost: false,
       showItemDims: true,
+      ignoreChairOverlap: true,
+      wallThicknessMm: 100,
+      gridOrigin: { x: 0, y: 0 },
     },
   };
 }
@@ -159,7 +162,10 @@ function snapshot() {
   return JSON.stringify(state.project);
 }
 function restore(json) {
+  // どのプランを見ているかは「作業内容」ではないので、Undoで勝手に切り替わらないようにする
+  const viewing = state.project.activePlanId;
   state.project = JSON.parse(json);
+  if (state.project.plans.some((p) => p.id === viewing)) state.project.activePlanId = viewing;
   state.selection.clear();
   bus.emit('project:loaded');
   bus.emit('history:changed');

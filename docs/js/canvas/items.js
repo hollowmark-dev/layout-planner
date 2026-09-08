@@ -107,10 +107,13 @@ function paint(node, it, selected) {
   const body = node.findOne('.body');
   const accents = node.find('.accent');
   if (body) {
+    const normal = shade(base, -0.35);
     body.fill(withAlpha(base, 0.42));
-    body.stroke(selected ? '#1d4ed8' : shade(base, -0.35));
+    body.stroke(selected ? '#1d4ed8' : normal);
     body.strokeWidth(selected ? 2.2 : 1.2);
     body.strokeScaleEnabled(false);
+    // 書き出すときに選択中の青枠を通常の線に戻すため、素の色を覚えておく
+    body.setAttr('normalStroke', normal);
   }
   accents.forEach((a) => {
     a.fill(withAlpha(base, 0.75));
@@ -218,6 +221,17 @@ function rebuildChildren(g, it) {
   updateLabelVisibility(g);
 }
 
+/**
+ * 見た目に関わる値をまとめたもの。これが変わっていなければ、
+ * 子ノードは作り直さず位置と角度だけ直す。
+ * 全部作り直すと、数百点置いたときに1操作ごとに固まる。
+ */
+function visualKey(it) {
+  const st = state.project.settings;
+  return [it.w, it.d, it.shape, colorOf(it), it.label, it.name,
+    st.showItemDims !== false].join('|');
+}
+
 function updateNode(g, it) {
   g.position({ x: it.x, y: it.y });
   g.rotation(it.rot || 0);
@@ -227,7 +241,15 @@ function updateNode(g, it) {
   g.visible(visible);
   g.listening(visible && !locked);
   g.draggable(visible && !locked && state.tool === 'select');
-  rebuildChildren(g, it);
+
+  const key = visualKey(it);
+  if (g.getAttr('vkey') !== key) {
+    rebuildChildren(g, it);
+    g.setAttr('vkey', key);
+  } else {
+    paint(g, it, state.selection.has(it.id));
+    updateLabelVisibility(g);
+  }
 }
 
 function updateLabelVisibility(g) {
@@ -240,9 +262,14 @@ function updateLabelVisibility(g) {
 
 /* ── 同期 ───────────────────────────────────────────── */
 
+/** id から什器を引く表。毎回 find で探すと点数の2乗で効いてくる */
+const byId = new Map();
+
 export function syncItems() {
   const list = items();
   const seen = new Set();
+  byId.clear();
+  for (const it of list) byId.set(it.id, it);
   for (const it of list) {
     seen.add(it.id);
     let g = nodes.get(it.id);
@@ -300,7 +327,7 @@ function refreshTransformer() {
 
 function repaintSelection() {
   for (const [id, g] of nodes) {
-    const it = items().find((i) => i.id === id);
+    const it = byId.get(id);
     if (it) paint(g, it, state.selection.has(id));
   }
   refreshTransformer();
@@ -337,7 +364,7 @@ function bindNodeEvents(g) {
 
   g.on('dragmove', () => {
     if (!dragCtx) return;
-    const it = items().find((i) => i.id === g.id());
+    const it = byId.get(g.id());
     if (!it) return;
     const others = items().filter((o) => !dragCtx.start.has(o.id));
     const snapped = snapPosition({ ...it, x: g.x(), y: g.y() }, others);
@@ -361,7 +388,7 @@ function bindNodeEvents(g) {
     let moved = false;
     for (const [id] of dragCtx.start) {
       const n = nodes.get(id);
-      const it = items().find((i) => i.id === id);
+      const it = byId.get(id);
       if (!n || !it) continue;
       if (it.x !== n.x() || it.y !== n.y()) moved = true;
       it.x = round1(n.x());
@@ -451,11 +478,28 @@ function bindStageSelection() {
 
 /* ── 変形（回転・寸法変更） ─────────────────────────── */
 
+/** Shiftを押している間は角度の刻みを外す（ヘルプにそう書いてあるのに効いていなかった） */
+const ROT_SNAPS = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165,
+  180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345];
+let shiftDown = false;
+
 function bindTransform() {
+  window.addEventListener('keydown', (e) => { if (e.key === 'Shift') shiftDown = true; });
+  window.addEventListener('keyup', (e) => { if (e.key === 'Shift') shiftDown = false; });
+  window.addEventListener('blur', () => { shiftDown = false; });
+
+  const applySnaps = (evt) => {
+    const free = (evt && evt.shiftKey) || shiftDown;
+    transformer.rotationSnaps(free ? [] : ROT_SNAPS);
+  };
+  transformer.on('transformstart', (e) => applySnaps(e.evt));
+  transformer.on('transform', (e) => applySnaps(e.evt));
+
   transformer.on('transformend', () => {
+    transformer.rotationSnaps(ROT_SNAPS);
     let changed = false;
     for (const n of transformer.nodes()) {
-      const it = items().find((i) => i.id === n.id());
+      const it = byId.get(n.id());
       if (!it) continue;
       const sx = n.scaleX(); const sy = n.scaleY();
       if (Math.abs(sx - 1) > 0.001 || Math.abs(sy - 1) > 0.001) {
@@ -475,7 +519,7 @@ function bindTransform() {
 /* ── 初期化 ─────────────────────────────────────────── */
 
 export function initItems() {
-  ghostGroup = new Konva.Group({ listening: false });
+  ghostGroup = new Konva.Group({ name: 'ghost', listening: false });
   bgLayer.add(ghostGroup);
 
   guideGroup = new Konva.Group({ listening: false });
@@ -484,8 +528,7 @@ export function initItems() {
     strokeScaleEnabled: false, visible: false, listening: false,
   });
   transformer = new Konva.Transformer({
-    rotationSnaps: [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165,
-      180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345],
+    rotationSnaps: ROT_SNAPS,
     rotationSnapTolerance: 7,
     keepRatio: false,
     ignoreStroke: true,
@@ -508,15 +551,12 @@ export function initItems() {
   bus.on('plan:changed', syncItems);
   bus.on('layers:changed', syncItems);
   bus.on('view:changed', () => {
-    for (const [id, g] of nodes) {
-      const it = items().find((i) => i.id === id);
-      if (it) updateLabelVisibility(g);
-    }
+    for (const [, g] of nodes) updateLabelVisibility(g);
     mainLayer.batchDraw();
   });
   bus.on('tool:changed', () => {
     for (const [id, g] of nodes) {
-      const it = items().find((i) => i.id === id);
+      const it = byId.get(id);
       const layer = it ? layerById(it.layerId) : null;
       g.draggable(state.tool === 'select' && !(layer && layer.locked));
     }

@@ -10,9 +10,20 @@
 
 import { state } from '../state.js';
 import { itemAabb, snapTo } from '../geom.js';
+
 import { screenToMm } from './stage.js';
 
 const THRESHOLD_PX = 8;
+
+/** グリッドは図面の左上ではなく、指定した原点（通り芯など）を基準にする */
+function gridSnap(v, step) {
+  const org = state.project.settings.gridOrigin || { x: 0, y: 0 };
+  return snapTo(v - org.x, step) + org.x;
+}
+function gridSnapY(v, step) {
+  const org = state.project.settings.gridOrigin || { x: 0, y: 0 };
+  return snapTo(v - org.y, step) + org.y;
+}
 
 /**
  * @param {object} moving  動かしている什器（x,y は移動後の候補値）
@@ -82,7 +93,7 @@ export function snapPosition(moving, others) {
       const cands = [box.minX, box.maxX, (box.minX + box.maxX) / 2];
       let best = { d: tol, delta: null };
       for (const c of cands) {
-        const t = snapTo(c, st.gridMm);
+        const t = gridSnap(c, st.gridMm);
         const d = Math.abs(t - c);
         if (d < best.d) best = { d, delta: t - c };
       }
@@ -92,7 +103,7 @@ export function snapPosition(moving, others) {
       const cands = [box.minY, box.maxY, (box.minY + box.maxY) / 2];
       let best = { d: tol, delta: null };
       for (const c of cands) {
-        const t = snapTo(c, st.gridMm);
+        const t = gridSnapY(c, st.gridMm);
         const d = Math.abs(t - c);
         if (d < best.d) best = { d, delta: t - c };
       }
@@ -108,8 +119,8 @@ export function snapPoint(p) {
   const st = state.project.settings;
   if (!st.snapGrid || !st.gridMm) return p;
   const tol = screenToMm(THRESHOLD_PX);
-  const sx = snapTo(p.x, st.gridMm);
-  const sy = snapTo(p.y, st.gridMm);
+  const sx = gridSnap(p.x, st.gridMm);
+  const sy = gridSnapY(p.y, st.gridMm);
   return {
     x: Math.abs(sx - p.x) < tol ? sx : p.x,
     y: Math.abs(sy - p.y) < tol ? sy : p.y,

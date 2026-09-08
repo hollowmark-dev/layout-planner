@@ -95,6 +95,31 @@ export function polyDist(A, B) {
   return min;
 }
 
+/**
+ * 凸多角形どうしの重なりの深さ。離れていれば 0。
+ * 距離だけだと「突き合わせて置いた（0mm）」と「めり込んでいる」の区別がつかず、
+ * 通路チェックが意図した配置まで拾ってしまう。
+ */
+export function penetration(A, B) {
+  let min = Infinity;
+  for (const poly of [A, B]) {
+    for (let i = 0; i < poly.length; i += 1) {
+      const p1 = poly[i];
+      const p2 = poly[(i + 1) % poly.length];
+      const len = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
+      const ax = -(p2.y - p1.y) / len;
+      const ay = (p2.x - p1.x) / len;
+      let a0 = Infinity; let a1 = -Infinity; let b0 = Infinity; let b1 = -Infinity;
+      for (const q of A) { const v = q.x * ax + q.y * ay; if (v < a0) a0 = v; if (v > a1) a1 = v; }
+      for (const q of B) { const v = q.x * ax + q.y * ay; if (v < b0) b0 = v; if (v > b1) b1 = v; }
+      const overlap = Math.min(a1, b1) - Math.max(a0, b0);
+      if (overlap <= 0) return 0;
+      if (overlap < min) min = overlap;
+    }
+  }
+  return min;
+}
+
 /** 2つの多角形の、最短距離を与える点の組（チェック結果の表示に使う） */
 export function closestPoints(A, B) {
   let best = { d: Infinity, p: A[0], q: B[0] };

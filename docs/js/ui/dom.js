@@ -96,6 +96,25 @@ export function openModal(opts) {
   return { close, body };
 }
 
+/**
+ * 閉じられない「処理中」表示。時間のかかる処理の間、何も起きていないように
+ * 見えるのを防ぐ。返り値の close() で閉じる。
+ */
+export function openBusy(title, message) {
+  const msg = el('p', { class: 'lead', text: message || '' , style: 'margin:0'});
+  const box = el('div', { class: 'modal', style: 'width:min(320px,90vw);text-align:center' }, [
+    el('div', { class: 'spinner' }),
+    el('h2', { text: title, style: 'margin:10px 0 4px' }),
+    msg,
+  ]);
+  const bg = el('div', { class: 'modal-bg' }, [box]);
+  $('#modal-root').append(bg);
+  return {
+    update: (text) => { msg.textContent = text; },
+    close: () => bg.remove(),
+  };
+}
+
 export function closeModal() {
   closeCurrent?.();
 }
