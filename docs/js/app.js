@@ -156,8 +156,13 @@ function bindMenus() {
       // ツールバーの overflow に切り取られないよう、画面基準で置き直す
       const r = btn.getBoundingClientRect();
       const w = body.offsetWidth || 200;
+      const vw = document.documentElement.clientWidth || window.innerWidth || 0;
+      // 右端からはみ出すときは内側へ寄せる。画面幅が取れない場合でも
+      // 画面外へ飛ばさないよう下限を切っておく
+      let left = r.left;
+      if (vw > w) left = Math.min(left, vw - w - 8);
       body.style.top = `${Math.round(r.bottom + 4)}px`;
-      body.style.left = `${Math.round(Math.min(r.left, window.innerWidth - w - 8))}px`;
+      body.style.left = `${Math.round(Math.max(8, left))}px`;
     });
   });
   document.addEventListener('click', closeAll);
