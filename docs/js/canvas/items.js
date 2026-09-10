@@ -23,76 +23,273 @@ let guideGroup = null;
 let bandRect = null;
 let ghostGroup = null;
 
-/* ── 見た目 ─────────────────────────────────────────── */
+/* ── 見た目（CAD風の線画） ────────────────────────────
+ *
+ * 什器1点 = Konva.Shape 1個（sceneFunc で輪郭・内部の細線をまとめて描く）＋ ラベル。
+ * 線の太さは「紙の上の mm」で決め、画面では 96dpi 換算（下限つき）、
+ * 書き出しでは Stage の pxPerPaperMm 属性から算出する。
+ */
 
-const SHAPE_BUILDERS = {
-  rect: (it) => [new Konva.Rect({
-    x: -it.w / 2, y: -it.d / 2, width: it.w, height: it.d, name: 'body',
-  })],
+const PX_PER_PAPER_MM_SCREEN = 96 / 25.4;
+/** 紙の上の線の太さ（mm）。JIS の細線/太線の比にならって 1 : 2 程度 */
+const LW_MM = { outline: 0.25, detail: 0.13, thin: 0.09 };
+/** 画面での下限（px）。これより細いとアンチエイリアスで消える */
+const LW_FLOOR_PX = { outline: 1.0, detail: 0.6, thin: 0.5 };
 
-  ellipse: (it) => [new Konva.Ellipse({
-    radiusX: it.w / 2, radiusY: it.d / 2, name: 'body',
-  })],
+function lineWidthPx(cls, stg) {
+  const k = stg && stg.getAttr('pxPerPaperMm');
+  if (k) return LW_MM[cls] * k;
+  return Math.max(LW_FLOOR_PX[cls], LW_MM[cls] * PX_PER_PAPER_MM_SCREEN);
+}
 
-  // L字デスク：上辺いっぱいの天板と、左へ伸びるサイド
-  l: (it) => {
-    const w = it.w; const d = it.d;
-    const dr = d * 0.45; const wm = w * 0.55;
-    return [new Konva.Line({
-      points: [
-        -w / 2, -d / 2, w / 2, -d / 2, w / 2, -d / 2 + dr,
-        -w / 2 + wm, -d / 2 + dr, -w / 2 + wm, d / 2, -w / 2, d / 2,
-      ],
-      closed: true,
-      name: 'body',
-    })];
+/* パスの部品。ctx は Konva.Context。beginPath は呼び出し側 */
+const P = {
+  rect: (x, y, w, h) => (c) => c.rect(x, y, w, h),
+  rrect: (x, y, w, h, r0) => (c) => {
+    const r = Math.min(r0, w / 2, h / 2);
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
   },
-
-  // 椅子：座面と背もたれ（背は -y 側 ＝ 什器の「後ろ」）
-  chair: (it) => {
-    const back = Math.max(it.d * 0.16, 30);
-    return [
-      new Konva.Rect({
-        x: -it.w / 2, y: -it.d / 2 + back, width: it.w, height: it.d - back,
-        cornerRadius: Math.min(it.w, it.d) * 0.14, name: 'body',
-      }),
-      new Konva.Rect({
-        x: -it.w / 2, y: -it.d / 2, width: it.w, height: back,
-        cornerRadius: back / 3, name: 'accent',
-      }),
-    ];
+  line: (x1, y1, x2, y2) => (c) => { c.moveTo(x1, y1); c.lineTo(x2, y2); },
+  poly: (pts) => (c) => {
+    c.moveTo(pts[0], pts[1]);
+    for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]);
+    c.closePath();
   },
-
-  // ソファ：座面＋背＋肘
-  sofa: (it) => {
-    const back = Math.max(it.d * 0.22, 80);
-    const arm = Math.max(it.w * 0.09, 70);
-    return [
-      new Konva.Rect({
-        x: -it.w / 2, y: -it.d / 2, width: it.w, height: it.d,
-        cornerRadius: 30, name: 'body',
-      }),
-      new Konva.Rect({ x: -it.w / 2, y: -it.d / 2, width: it.w, height: back, name: 'accent' }),
-      new Konva.Rect({ x: -it.w / 2, y: -it.d / 2, width: arm, height: it.d, name: 'accent' }),
-      new Konva.Rect({ x: it.w / 2 - arm, y: -it.d / 2, width: arm, height: it.d, name: 'accent' }),
-    ];
+  ellipse: (cx, cy, rx, ry) => (c) => { c.moveTo(cx + rx, cy); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); },
+  arc: (cx, cy, r, a0, a1) => (c) => {
+    c.moveTo(cx + r * Math.cos(a0), cy + r * Math.sin(a0));
+    c.arc(cx, cy, r, a0, a1);
   },
-
-  // ボート型テーブル
-  boat: (it) => [new Konva.Line({
-    points: [
-      -it.w / 2, 0, -it.w / 4, -it.d / 2, it.w / 4, -it.d / 2,
-      it.w / 2, 0, it.w / 4, it.d / 2, -it.w / 4, it.d / 2,
-    ],
-    closed: true,
-    tension: 0.35,
-    name: 'body',
-  })],
+  all: (...fns) => (c) => fns.forEach((f) => f(c)),
 };
 
-function shapeFor(it) {
-  const build = SHAPE_BUILDERS[it.shape] || SHAPE_BUILDERS.rect;
+const D = (cls, path, extra = {}) => ({ cls, path, ...extra });
+const deskBack = (d) => Math.min(60, d * 0.1);
+
+function deskWithPedestals(it, sides) {
+  const { w, d } = it;
+  const bk = deskBack(d);
+  const pw = clamp(w * 0.3, 350, 450);
+  const g = 20;
+  const details = [D('detail', P.line(-w / 2, -d / 2 + bk, w / 2, -d / 2 + bk))];
+  for (const s of sides) {
+    const x = s === 'r' ? w / 2 - g - pw : -w / 2 + g;
+    details.push(D('detail', P.rect(x, -d / 2 + bk, pw, d - bk - g)));
+  }
+  return { body: P.rect(-w / 2, -d / 2, w, d), details };
+}
+
+function lockerCount(it) {
+  if (it.n) return it.n;
+  const m = /(\d+)\s*人/.exec(it.name || '');
+  if (m) return Number(m[1]);
+  return Math.max(1, Math.round(it.w / 300));
+}
+
+/**
+ * 記号の定義。ローカル座標は什器の中心が原点、+y が「前」（椅子の背は -y）。
+ *   body    … 塗りと輪郭（太線）。当たり判定はこれとは別に外形矩形
+ *   details … 内部の細線。lod:false 以外は小さく表示しているとき省く
+ */
+const SYMBOLS = {
+  rect: ({ w, d }) => ({ body: P.rect(-w / 2, -d / 2, w, d), details: [] }),
+  ellipse: ({ w, d }) => ({ body: P.ellipse(0, 0, w / 2, d / 2), details: [] }),
+
+  // 平机：背側（-y）に幕板／配線ダクトの線。向きが分かる
+  desk: ({ w, d }) => ({
+    body: P.rect(-w / 2, -d / 2, w, d),
+    details: [D('detail', P.line(-w / 2, -d / 2 + deskBack(d), w / 2, -d / 2 + deskBack(d)))],
+  }),
+  desk_side: (it) => deskWithPedestals(it, ['r']),
+  desk_both: (it) => deskWithPedestals(it, ['l', 'r']),
+
+  // テーブル類：天板の縁を二重線で
+  table: ({ w, d }) => ({
+    body: P.rect(-w / 2, -d / 2, w, d),
+    details: [D('detail', P.rect(-w / 2 + 40, -d / 2 + 40, w - 80, d - 80))],
+  }),
+  round_table: ({ w, d }) => ({
+    body: P.ellipse(0, 0, w / 2, d / 2),
+    details: [D('detail', P.ellipse(0, 0, w / 2 - 40, d / 2 - 40))],
+  }),
+
+  l: ({ w, d }) => {
+    const dr = d * 0.45; const wm = w * 0.55; const bk = deskBack(dr);
+    return {
+      body: P.poly([-w / 2, -d / 2, w / 2, -d / 2, w / 2, -d / 2 + dr,
+        -w / 2 + wm, -d / 2 + dr, -w / 2 + wm, d / 2, -w / 2, d / 2]),
+      details: [
+        D('detail', P.line(-w / 2, -d / 2 + bk, w / 2, -d / 2 + bk)),
+        D('detail', P.line(-w / 2 + bk, -d / 2 + bk, -w / 2 + bk, d / 2)),
+      ],
+    };
+  },
+
+  boat: ({ w, d }) => ({
+    body: (c) => {
+      c.moveTo(-w / 2, -d * 0.3);
+      c.quadraticCurveTo(0, -d * 0.7, w / 2, -d * 0.3);
+      c.lineTo(w / 2, d * 0.3);
+      c.quadraticCurveTo(0, d * 0.7, -w / 2, d * 0.3);
+      c.closePath();
+    },
+    details: [],
+  }),
+
+  // 椅子：座面＋背もたれ＋肘
+  chair: ({ w, d }) => {
+    const bk = Math.max(d * 0.18, 60);
+    const sw = w * 0.84;
+    const r = Math.min(w, d) * 0.12;
+    return {
+      body: P.rrect(-sw / 2, -d / 2 + bk, sw, d - bk, r),
+      details: [
+        D('outline', P.rrect(-sw * 0.475, -d / 2, sw * 0.95, bk * 0.6, bk * 0.3), { lod: false, fill: true }),
+        D('detail', P.all(
+          P.rect(-w / 2, -d / 2 + bk + d * 0.1, w * 0.08, d * 0.55),
+          P.rect(w / 2 - w * 0.08, -d / 2 + bk + d * 0.1, w * 0.08, d * 0.55),
+        )),
+      ],
+    };
+  },
+
+  // ソファ：外形＋背・肘の線＋座クッションの分割
+  sofa: ({ w, d }) => {
+    const back = Math.max(d * 0.22, 80);
+    const arm = Math.max(w * 0.09, 70);
+    const inner = w - arm * 2;
+    const n = Math.max(1, Math.round(inner / 650));
+    const details = [
+      D('detail', P.line(-w / 2 + arm, -d / 2 + back, w / 2 - arm, -d / 2 + back)),
+      D('detail', P.line(-w / 2 + arm, -d / 2, -w / 2 + arm, d / 2)),
+      D('detail', P.line(w / 2 - arm, -d / 2, w / 2 - arm, d / 2)),
+    ];
+    for (let i = 1; i < n; i += 1) {
+      const x = -w / 2 + arm + (inner * i) / n;
+      details.push(D('thin', P.line(x, -d / 2 + back, x, d / 2)));
+    }
+    return { body: P.rrect(-w / 2, -d / 2, w, d, 40), details };
+  },
+
+  // 収納：前面の線（ラテラル・ワゴンなど閉じた箱）
+  cabinet: ({ w, d }) => ({
+    body: P.rect(-w / 2, -d / 2, w, d),
+    details: [D('detail', P.line(-w / 2, d / 2 - 30, w / 2, d / 2 - 30))],
+  }),
+  // 両開き：扉の軌跡（開き勝手と必要スペースが分かる）
+  cabinet_swing: ({ w, d }) => ({
+    body: P.rect(-w / 2, -d / 2, w, d),
+    details: [
+      D('detail', P.line(-w / 2, d / 2, -w / 2, d / 2 + w / 2)),
+      D('thin', P.arc(-w / 2, d / 2, w / 2, 0, Math.PI / 2)),
+      D('detail', P.line(w / 2, d / 2, w / 2, d / 2 + w / 2)),
+      D('thin', P.arc(w / 2, d / 2, w / 2, Math.PI / 2, Math.PI)),
+    ],
+  }),
+  // 引違い：前後2枚の戸をずらした2本線
+  cabinet_slide: ({ w, d }) => ({
+    body: P.rect(-w / 2, -d / 2, w, d),
+    details: [
+      D('detail', P.line(-w / 2, d / 2 - 35, w * 0.04, d / 2 - 35)),
+      D('detail', P.line(-w * 0.04, d / 2 - 70, w / 2, d / 2 - 70)),
+    ],
+  }),
+  // オープン棚：背板の線＋対角線（棚の慣用表現）
+  shelf_open: ({ w, d }) => ({
+    body: P.rect(-w / 2, -d / 2, w, d),
+    details: [
+      D('detail', P.line(-w / 2, -d / 2 + 25, w / 2, -d / 2 + 25)),
+      D('thin', P.line(-w / 2, d / 2, w / 2, -d / 2)),
+    ],
+  }),
+  // ロッカー：人数分の区画
+  locker: (it) => {
+    const { w, d } = it;
+    const n = lockerCount(it);
+    const details = [];
+    for (let i = 1; i < n; i += 1) {
+      const x = -w / 2 + (w * i) / n;
+      details.push(D('detail', P.line(x, -d / 2, x, d / 2)));
+    }
+    return { body: P.rect(-w / 2, -d / 2, w, d), details };
+  },
+
+  // 扉の開き（障害物）：吊元は左下、扇形が軌跡
+  door: ({ w, d }) => ({
+    body: (c) => {
+      c.moveTo(-w / 2, d / 2);
+      c.lineTo(-w / 2, d / 2 - w);
+      c.arc(-w / 2, d / 2, w, -Math.PI / 2, 0);
+      c.closePath();
+    },
+    outlineCls: 'detail',
+    details: [],
+  }),
+};
+
+function symbolFor(it) {
+  const build = SYMBOLS[it.shape] || SYMBOLS.rect;
   return build(it);
+}
+
+function drawSymbol(c, shape) {
+  const it = shape.getAttr('item');
+  const sym = shape.getAttr('sym');
+  const s = shape.getAttr('style');
+  const stg = shape.getStage();
+  const k = shape.getAbsoluteScale().x || 1;   // キャンバスpx / mm
+
+  const outlinePx = lineWidthPx(sym.outlineCls || 'outline', stg);
+  c.setAttr('lineJoin', 'miter');
+  c.setAttr('lineCap', 'butt');
+  c.beginPath();
+  sym.body(c);
+  c.setAttr('fillStyle', s.fill);
+  c.fill();
+  c.setAttr('strokeStyle', s.ink);
+  c.setAttr('lineWidth', outlinePx / k);
+  c.setLineDash(s.dash ? [8 / k, 5 / k] : []);
+  c.stroke();
+  c.setLineDash([]);
+
+  // 小さく表示しているときは細部を省く（ノイズになるうえ、線が潰れる）
+  const px = Math.min(it.w, it.d) * k;
+  const tooSmall = px < 12 * Math.max(1, outlinePx);
+  for (const dt of sym.details) {
+    if (tooSmall && dt.lod !== false) continue;
+    c.beginPath();
+    dt.path(c);
+    if (dt.fill) { c.setAttr('fillStyle', s.fill); c.fill(); }
+    c.setAttr('lineWidth', lineWidthPx(dt.cls, stg) / k);
+    c.setAttr('strokeStyle', s.ink);
+    c.stroke();
+  }
+}
+
+/** 当たり判定は外形矩形。細い線だけだと掴めない */
+function hitSymbol(c, shape) {
+  const it = shape.getAttr('item');
+  c.beginPath();
+  c.rect(-it.w / 2, -it.d / 2, it.w, it.d);
+  c.fillStrokeShape(shape);
+}
+
+/**
+ * 記号が什器の外形からはみ出す量（mm）。両開き書庫の扉の軌跡など。
+ * 書き出し範囲の計算で、端が切れないようにするために使う。
+ */
+export function symbolPadMm(it) {
+  if (it.shape === 'cabinet_swing') return it.w / 2;
+  return 0;
+}
+
+function isZone(it) {
+  return it.kind === 'zone' || String(it.templateId || '').startsWith('shape-');
 }
 
 function colorOf(it) {
@@ -101,27 +298,45 @@ function colorOf(it) {
   return it.color || '#93c5fd';
 }
 
-/** 塗りは薄く、輪郭ははっきり。図面が透けて見えるのが大事 */
-function paint(node, it, selected) {
-  const base = colorOf(it);
-  const body = node.findOne('.body');
-  const accents = node.find('.accent');
-  if (body) {
-    const normal = shade(base, -0.35);
-    body.fill(withAlpha(base, 0.42));
-    body.stroke(selected ? '#1d4ed8' : normal);
-    body.strokeWidth(selected ? 2.2 : 1.2);
-    body.strokeScaleEnabled(false);
-    // 書き出すときに選択中の青枠を通常の線に戻すため、素の色を覚えておく
-    body.setAttr('normalStroke', normal);
+/** 線の色（ink）と塗り（fill）。塗りは白の半透明が基本で、下地の図面がうっすら透ける */
+function styleOf(it, selected) {
+  const st = state.project.settings;
+  let ink; let fill; let dash = false;
+  if (it.kind === 'obstacle') {
+    ink = '#4b5563';
+    fill = it.shape === 'door' ? 'rgba(156,163,175,.22)' : 'rgba(156,163,175,.6)';
+  } else if (isZone(it)) {
+    const base = colorOf(it);
+    ink = shade(base, -0.35);
+    fill = withAlpha(base, 0.28);
+    dash = true;
+  } else {
+    ink = st.colorByLayer ? (layerById(it.layerId)?.color || '#111827') : '#111827';
+    // 塗りは既定で白85%（CADの什器ブロックと同じで下地を隠す）。
+    // 0 にすると完全に透過し、什器の下の図面を確かめられる
+    const a = st.itemFillOpacity ?? 0.85;
+    fill = st.itemTint
+      ? withAlpha(mix(it.color || '#93c5fd', '#ffffff', 0.85), a)
+      : `rgba(255,255,255,${a})`;
   }
-  accents.forEach((a) => {
-    a.fill(withAlpha(base, 0.75));
-    a.stroke(shade(base, -0.35));
-    a.strokeWidth(1);
-    a.strokeScaleEnabled(false);
-  });
-  const ink = shade(base, -0.62);
+  if (selected) { ink = '#1d4ed8'; fill = 'rgba(191,219,254,.8)'; }
+  return { ink, fill, dash };
+}
+
+function labelInk(it) {
+  if (it.kind === 'obstacle') return '#374151';
+  if (isZone(it)) return shade(colorOf(it), -0.62);
+  return state.project.settings.colorByLayer ? shade(layerById(it.layerId)?.color || '#111827', -0.3) : '#111827';
+}
+
+function paint(node, it, selected) {
+  const body = node.findOne('.body');
+  if (body) {
+    const normal = styleOf(it, false);
+    body.setAttr('normalStyle', normal);
+    body.setAttr('style', selected ? styleOf(it, true) : normal);
+  }
+  const ink = labelInk(it);
   node.find('.label').forEach((t) => t.fill(ink));
   node.find('.labeldim').forEach((t) => t.fill(ink));
 }
@@ -135,11 +350,31 @@ function shade(hex, amt) {
   const f = (v) => Math.round(Math.min(255, Math.max(0, amt < 0 ? v * (1 + amt) : v + (255 - v) * amt)));
   return `rgb(${f(r)},${f(g)},${f(b)})`;
 }
+function mix(hexA, hexB, t) {
+  const a = hex2rgb(hexA); const b = hex2rgb(hexB);
+  const m = (x, y) => Math.round(x + (y - x) * t);
+  return `#${[m(a.r, b.r), m(a.g, b.g), m(a.b, b.b)].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
 function hex2rgb(hex) {
   let h = String(hex || '#93c5fd').replace('#', '');
   if (h.length === 3) h = h.split('').map((c) => c + c).join('');
   const n = parseInt(h, 16);
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+/** 什器本体のノード。書き出し時の複製でも attrs（item/sym/style）はそのまま写る */
+function bodyNode(it) {
+  return new Konva.Shape({
+    name: 'body',
+    // 図形は中心原点で描くので、外接矩形だけ Transformer 用に申告する
+    x: -it.w / 2, y: -it.d / 2, width: it.w, height: it.d,
+    offsetX: -it.w / 2, offsetY: -it.d / 2,
+    item: { w: it.w, d: it.d, name: it.name, shape: it.shape, kind: it.kind, n: it.n },
+    sym: symbolFor(it),
+    style: styleOf(it, false),
+    sceneFunc: drawSymbol,
+    hitFunc: hitSymbol,
+  });
 }
 
 /* ── ノードの生成と更新 ─────────────────────────────── */
@@ -166,7 +401,16 @@ function textWidth(text, size) {
  * 枠に収まるところまで文字を小さくし、それでも入らなければ寸法の行を落とす。
  * 1行に詰め込んで折り返すと「平机 1000×」「700」のように読めなくなるため。
  */
+/** 什器と一緒に回ると文字が逆さになる。90〜270度のときは文字だけ180度戻す */
+function labelFlipped(it) {
+  const r = ((it.rot || 0) % 360 + 360) % 360;
+  return r > 90 && r < 270;
+}
+
 function labelNodes(it) {
+  // 椅子に品名は付けない。CADの椅子記号に文字は入らないし、
+  // 650角に省略された名前が乗るとかえって読みにくい
+  if (it.shape === 'chair' && !it.label) return [];
   const main = it.label || baseName(it.name);
   const dim = it.w + '×' + it.d;
   const boxW = it.w * 0.9;
@@ -186,6 +430,7 @@ function labelNodes(it) {
 
   const totalH = showDim ? size * LH + dimSize * LH : size * LH;
   let y = -totalH / 2;
+  const flip = labelFlipped(it);
 
   const line = (name, text, fs, opacity) => {
     const node = new Konva.Text({
@@ -197,8 +442,11 @@ function labelNodes(it) {
       verticalAlign: 'middle',
       width: it.w,
       height: fs * LH,
-      x: -it.w / 2,
-      y,
+      x: 0,
+      y: y + (fs * LH) / 2,
+      offsetX: it.w / 2,
+      offsetY: (fs * LH) / 2,
+      rotation: flip ? 180 : 0,
       opacity,
       listening: false,
       wrap: 'none',
@@ -208,14 +456,39 @@ function labelNodes(it) {
     return node;
   };
 
-  const nodes = [line('label', main, size, 1)];
-  if (showDim) nodes.push(line('labeldim', dim, dimSize, 0.72));
+  const halo = (name, text, fs, yy) => {
+    const bw = Math.min(it.w, textWidth(text, fs) + fs * 0.4);
+    return new Konva.Rect({
+      name: 'labelbg',
+      for: name,
+      x: 0,
+      y: yy + (fs * LH) / 2,
+      width: bw,
+      height: fs * LH,
+      offsetX: bw / 2,
+      offsetY: (fs * LH) / 2,
+      rotation: flip ? 180 : 0,
+      fill: 'rgba(255,255,255,.82)',
+      listening: false,
+    });
+  };
+  // 什器が180度回っていると、グループの回転で上下が入れ替わる。
+  // 名前が常に上に来るよう、反転時は並べる順を先に入れ替えておく
+  const rows = showDim
+    ? (flip
+      ? [['labeldim', dim, dimSize, 0.72], ['label', main, size, 1]]
+      : [['label', main, size, 1], ['labeldim', dim, dimSize, 0.72]])
+    : [['label', main, size, 1]];
+  const nodes = [];
+  for (const [nm, text, fs, op] of rows) {
+    nodes.push(halo(nm, text, fs, y), line(nm, text, fs, op));
+  }
   return nodes;
 }
 
 function rebuildChildren(g, it) {
   g.destroyChildren();
-  shapeFor(it).forEach((s) => g.add(s));
+  g.add(bodyNode(it));
   labelNodes(it).forEach((n) => g.add(n));
   paint(g, it, state.selection.has(it.id));
   updateLabelVisibility(g);
@@ -228,8 +501,8 @@ function rebuildChildren(g, it) {
  */
 function visualKey(it) {
   const st = state.project.settings;
-  return [it.w, it.d, it.shape, colorOf(it), it.label, it.name,
-    st.showItemDims !== false].join('|');
+  return [it.w, it.d, it.shape, it.kind, it.n, it.label, it.name,
+    labelFlipped(it), st.showItemDims !== false].join('|');
 }
 
 function updateNode(g, it) {
@@ -258,6 +531,7 @@ function updateLabelVisibility(g) {
   const s = pxPerMmScreen();
   g.find('.label').forEach((t) => t.visible(t.fontSize() * s >= 7));
   g.find('.labeldim').forEach((t) => t.visible(t.fontSize() * s >= 8));
+  g.find('.labelbg').forEach((r) => r.visible(g.findOne('.' + r.getAttr('for'))?.visible() ?? false));
 }
 
 /* ── 同期 ───────────────────────────────────────────── */
@@ -298,14 +572,10 @@ function syncGhost() {
     if (p.id === cur.id) continue;
     for (const it of p.items) {
       const g = new Konva.Group({ x: it.x, y: it.y, rotation: it.rot || 0, opacity: 0.3 });
-      shapeFor(it).forEach((s) => {
-        s.fill('rgba(107,114,128,.25)');
-        s.stroke('#6b7280');
-        s.strokeWidth(1);
-        s.dash([6, 4]);
-        s.strokeScaleEnabled(false);
-        g.add(s);
-      });
+      const b = bodyNode(it);
+      b.setAttr('style', { ink: '#6b7280', fill: 'rgba(107,114,128,.15)', dash: true });
+      b.listening(false);
+      g.add(b);
       ghostGroup.add(g);
     }
   }

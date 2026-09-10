@@ -31,6 +31,16 @@ export async function loadCatalog() {
   renderPalette();
 }
 
+/** id からテンプレートを引く。古いプロジェクトの shape を補うときに使う */
+export function templateById(id) {
+  if (!id) return null;
+  for (const c of allCategories()) {
+    const hit = c.items.find((t) => t.id === id);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 function myTemplates() {
   try {
     return JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
@@ -118,6 +128,7 @@ function templateToItem(t, x, y) {
     color: t.color || '#93c5fd',
     // 障害物（壁・柱）は数量表と面積の集計に入れない
     kind: t.kind || 'furniture',
+    n: t.n,   // ロッカーの人数など、記号の描き方に使う
     x: Math.round(x),
     y: Math.round(y),
     rot: 0,
@@ -219,12 +230,22 @@ function openTemplateEditor() {
   const d = numberField('奥行 D', 700, 'mm', { min: 50, step: 10 });
   const h = numberField('高さ H', 700, 'mm', { min: 0, step: 10 });
   const shape = el('select', {}, [
-    el('option', { value: 'rect', text: '矩形' }),
-    el('option', { value: 'ellipse', text: '円・楕円' }),
-    el('option', { value: 'l', text: 'L字' }),
+    el('option', { value: 'rect', text: '矩形（そのまま）' }),
+    el('option', { value: 'desk', text: '平机（幕板の線あり）' }),
+    el('option', { value: 'desk_side', text: '片袖机' }),
+    el('option', { value: 'desk_both', text: '両袖机' }),
+    el('option', { value: 'l', text: 'L字デスク' }),
+    el('option', { value: 'table', text: 'テーブル（天板の縁）' }),
+    el('option', { value: 'round_table', text: '丸テーブル' }),
+    el('option', { value: 'boat', text: 'ボート型テーブル' }),
     el('option', { value: 'chair', text: '椅子' }),
     el('option', { value: 'sofa', text: 'ソファ' }),
-    el('option', { value: 'boat', text: 'ボート型' }),
+    el('option', { value: 'cabinet', text: '収納（前面の線）' }),
+    el('option', { value: 'cabinet_swing', text: '書庫（両開き・扉の軌跡）' }),
+    el('option', { value: 'cabinet_slide', text: '書庫（引違い）' }),
+    el('option', { value: 'shelf_open', text: 'オープン棚' }),
+    el('option', { value: 'locker', text: 'ロッカー（区画線）' }),
+    el('option', { value: 'ellipse', text: '円・楕円' }),
   ]);
   const color = el('input', { type: 'color', value: '#93c5fd' });
 

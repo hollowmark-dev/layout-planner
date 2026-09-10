@@ -11,6 +11,7 @@
 import { state, plan, items, notes, layerById } from '../state.js';
 import { itemAabb, fmtMm } from '../geom.js';
 import { bgLayer, mainLayer } from '../canvas/stage.js';
+import { symbolPadMm } from '../canvas/items.js';
 import { el, openModal, toast } from '../ui/dom.js';
 
 const PAPERS = {
@@ -42,7 +43,9 @@ export function contentRegion(marginMm = 300, itemsOnly = false) {
   if (!itemsOnly && d.pxPerMm && d.imgW) take(0, 0, d.imgW / d.pxPerMm, d.imgH / d.pxPerMm);
   for (const it of items()) {
     const b = itemAabb(it);
-    take(b.minX, b.minY, b.maxX, b.maxY);
+    // 両開き書庫の扉の軌跡など、外形からはみ出す記号ぶんを見込む
+    const pad = symbolPadMm(it);
+    take(b.minX - pad, b.minY - pad, b.maxX + pad, b.maxY + pad);
   }
   for (const nt of notes()) {
     if (nt.type === 'dim') take(Math.min(nt.x1, nt.x2), Math.min(nt.y1, nt.y2), Math.max(nt.x1, nt.x2), Math.max(nt.y1, nt.y2));
@@ -68,27 +71,41 @@ export function contentRegion(marginMm = 300, itemsOnly = false) {
  * ここを掃除しないと、そのときのズームや選択状態がそのまま印刷物に出てしまう
  * （引いて表示していると什器名が消える、選択中の青枠が印刷される、など）。
  */
-function stripScreenState(bg, main, { grid, ghost }) {
+function stripScreenState(bg, main, { grid, ghost, noFade, pxPerMmOut, pxPerPaperMm }) {
+  // 施工向けに下地を濃く出したいときは、図面を薄くする膜を外す
+  if (noFade) bg.find('.veil').forEach((n) => n.destroy());
   const gridShape = bg.findOne('.grid');
   if (grid && gridShape) gridShape.setAttr('force', true);
   else if (gridShape) gridShape.destroy();
 
   if (!ghost) bg.find('.ghost').forEach((n) => n.destroy());
 
-  // 画面倍率で隠していた文字を出す
+  // 画面倍率で隠していた文字を、紙の上の高さで判定し直す
+  // （1:200 で 200mm の文字は 1mm。読めないものは出さない）
   const showDim = state.project.settings.showItemDims !== false;
-  main.find('.label').forEach((t) => t.visible(true));
-  main.find('.labeldim').forEach((t) => t.visible(showDim));
+  const paperMm = (t) => (t.fontSize() * pxPerMmOut) / pxPerPaperMm;
+  main.find('.label').forEach((t) => t.visible(paperMm(t) >= 1.2));
+  main.find('.labeldim').forEach((t) => t.visible(showDim && paperMm(t) >= 1.4));
+  main.find('.labelbg').forEach((r) => {
+    const t = r.getParent()?.findOne('.' + r.getAttr('for'));
+    r.visible(!!t && t.visible());
+  });
 
   // 選択の強調を通常の見た目に戻す
   main.find('.body').forEach((b) => {
-    const normal = b.getAttr('normalStroke');
-    if (normal) { b.stroke(normal); b.strokeWidth(1.2); }
+    const normal = b.getAttr('normalStyle');
+    if (normal) b.setAttr('style', normal);
   });
   main.find('.selmark').forEach((n) => n.destroy());
 }
 
-function renderRegion(region, pxPerMmOut, { grid = false, ghost = false } = {}) {
+/**
+ * @param pxPerPaperMm  出力キャンバスの「紙1mmあたりpx」。線の太さ（紙の上のmm）の換算に使う。
+ *                      PNG のように紙がないときは 1:100 相当とみなす
+ */
+function renderRegion(region, pxPerMmOut, {
+  grid = false, ghost = false, noFade = false, pxPerPaperMm = pxPerMmOut * 100,
+} = {}) {
   const holder = document.createElement('div');
   holder.style.cssText = 'position:fixed;left:-99999px;top:0;';
   document.body.append(holder);
@@ -98,11 +115,12 @@ function renderRegion(region, pxPerMmOut, { grid = false, ghost = false } = {}) 
   const s = new Konva.Stage({ container: holder, width: w, height: h });
   s.scale({ x: pxPerMmOut, y: pxPerMmOut });
   s.position({ x: -region.x * pxPerMmOut, y: -region.y * pxPerMmOut });
+  s.setAttr('pxPerPaperMm', pxPerPaperMm);
 
   const bg = bgLayer.clone();
   const main = mainLayer.clone();
   s.add(bg, main);
-  stripScreenState(bg, main, { grid, ghost });
+  stripScreenState(bg, main, { grid, ghost, noFade, pxPerMmOut, pxPerPaperMm });
   s.draw();
 
   const canvas = s.toCanvas({ pixelRatio: 1 });
@@ -170,6 +188,7 @@ export function openPdfDialog() {
   ]);
 
   const gridChk = el('input', { type: 'checkbox' });
+  const fadeChk = el('input', { type: 'checkbox' });
   const info = el('p', { class: 'note' });
   const regionOf = () => contentRegion(300, rangeSel.value === 'items');
 
@@ -199,6 +218,7 @@ export function openPdfDialog() {
       el('label', { class: 'field' }, ['縮尺', scaleSel]),
       el('label', { class: 'field' }, ['解像度', dpiSel]),
       el('label', { class: 'chk', style: 'margin:6px 0' }, [gridChk, 'グリッドも印刷する']),
+      el('label', { class: 'chk', style: 'margin:6px 0' }, [fadeChk, '図面を薄くせず濃いまま出す']),
       info,
     ]),
     okLabel: '書き出す',
@@ -208,6 +228,7 @@ export function openPdfDialog() {
         scaleInput: scaleSel.value,
         dpi: Number(dpiSel.value),
         grid: gridChk.checked,
+        noFade: fadeChk.checked,
         region: regionOf(),
       });
       built.pdf.save(`${fileBase()}_1-${built.scale}.pdf`);
@@ -242,7 +263,9 @@ function resolveScale(input, region, area) {
  * PDFを組み立てて返す（保存はしない）。
  * 返り値の pdf.save() で保存する。分けてあるのは、寸法の検算をしたいため。
  */
-export function buildPdf({ paper, scaleInput, dpi = 300, grid = false, region = contentRegion() }) {
+export function buildPdf({
+  paper, scaleInput, dpi = 300, grid = false, noFade = false, region = contentRegion(),
+}) {
   const area = drawArea(paper);
   const S = resolveScale(scaleInput, region, area);
   const pxPerPaperMm = dpi / 25.4;
@@ -260,7 +283,9 @@ export function buildPdf({ paper, scaleInput, dpi = 300, grid = false, region = 
   // 図面。用紙に収まらないときは縮めずに範囲を切り取る。
   // 縮めて押し込むと、図枠には「1:100」と出るのに紙の上の寸法が合わなくなる
   const fit = cropToPaper(region, area, S);
-  const src = renderRegion(fit, pxPerRealMm, { grid, ghost: state.project.settings.showGhost });
+  const src = renderRegion(fit, pxPerRealMm, {
+    grid, noFade, ghost: state.project.settings.showGhost, pxPerPaperMm,
+  });
   const drawW = fit.w / S;   // 用紙上のmm
   const drawH = fit.h / S;
   const offX = (MARGIN + Math.max(0, (area.w - drawW) / 2)) * pxPerPaperMm;

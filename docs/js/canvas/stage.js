@@ -15,6 +15,7 @@ export let mainLayer = null;  // 什器・注記
 export let overlayLayer = null; // 選択枠・ガイド・チェック結果など一時的なもの
 
 let bgImageNode = null;
+let veilNode = null;
 let gridShape = null;
 let container = null;
 
@@ -35,8 +36,12 @@ export function initStage(containerEl) {
   stage.add(bgLayer, mainLayer, overlayLayer);
 
   bgImageNode = new Konva.Image({ image: null, x: 0, y: 0, listening: false });
+  // 図面を薄くする膜。CADの外部参照（xref）のフェードと同じ考え方で、
+  // 下地の線を灰色に落として什器の黒い線を立たせる
+  veilNode = new Konva.Rect({ name: 'veil', x: 0, y: 0, listening: false });
   gridShape = new Konva.Shape({ name: 'grid', listening: false, sceneFunc: drawGrid });
-  bgLayer.add(bgImageNode, gridShape);
+  bgLayer.add(bgImageNode, veilNode, gridShape);
+  bus.on('settings:changed', refreshBackground);
 
   stage.scale({ x: 0.05, y: 0.05 });
 
@@ -155,6 +160,15 @@ export function refreshBackground() {
     bgImageNode.scale({ x: k, y: k });
     // 背景は <img> のこともキャンバスのこともある（読み込み直後はキャンバス）
     bgImageNode.size({ width: d.imgW || img.width, height: d.imgH || img.height });
+    const fade = state.project.settings.drawingFade ?? 0.45;
+    veilNode.setAttrs({
+      width: (d.imgW || img.width) * (d.pxPerMm ? 1 / d.pxPerMm : 1),
+      height: (d.imgH || img.height) * (d.pxPerMm ? 1 / d.pxPerMm : 1),
+      fill: `rgba(255,255,255,${fade})`,
+      visible: shown && fade > 0,
+    });
+  } else {
+    veilNode.visible(false);
   }
   bgLayer.batchDraw();
 }

@@ -15,6 +15,7 @@ import {
 } from '../state.js';
 import { loadImage } from '../pdfload.js';
 import { refreshBackground, zoomToFit } from '../canvas/stage.js';
+import { templateById } from '../ui/palette.js';
 import { toast, confirmModal, openModal, openBusy, el } from '../ui/dom.js';
 
 const AUTOSAVE_KEY = 'layout-planner.autosave.v1';
@@ -102,6 +103,16 @@ export async function applyProject(data) {
   data.plans.forEach((p) => {
     p.items = p.items || [];
     p.notes = p.notes || [];
+    // 線画表現より前に保存したものは shape を持たない（あっても rect のまま）。
+    // テンプレートから引き直して、CADの記号で描けるようにする
+    p.items.forEach((it) => {
+      if (it.shape && it.shape !== 'rect') return;
+      const t = templateById(it.templateId);
+      if (!t) return;
+      if (t.shape) it.shape = t.shape;
+      if (t.n && !it.n) it.n = t.n;
+      if (t.kind && !it.kind) it.kind = t.kind;
+    });
   });
   if (!data.plans.some((p) => p.id === data.activePlanId)) data.activePlanId = data.plans[0].id;
 

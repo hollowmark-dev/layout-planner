@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "什器テンプレート。w=間口(W) d=奥行(D) h=高さ(H)、単位はmm。shape は rect / ellipse / l / chair / sofa / boat。自社什器はアプリの「＋自社什器を登録」から追加できます。",
+  "note": "什器テンプレート。w=間口(W) d=奥行(D) h=高さ(H)、単位はmm。shape はCAD平面図の記号の種類（rect / ellipse / desk / desk_side / desk_both / l / table / round_table / boat / chair / sofa / cabinet / cabinet_swing / cabinet_slide / shelf_open / locker / door）。locker は n に人数を入れる。kind は furniture（既定）／obstacle（壁・柱。数量表に入らない）／zone（通路帯などの領域表示）。自社什器はアプリの「＋自社什器を登録」から追加できます。",
   "categories": [
     {
       "name": "コクヨ",
@@ -13,7 +13,8 @@
           "w": 1000,
           "d": 700,
           "h": 720,
-          "color": "#93c5fd"
+          "color": "#93c5fd",
+          "shape": "desk"
         },
         {
           "id": "ky-is-1200-700",
@@ -21,7 +22,8 @@
           "w": 1200,
           "d": 700,
           "h": 720,
-          "color": "#93c5fd"
+          "color": "#93c5fd",
+          "shape": "desk"
         },
         {
           "id": "ky-is-1400-700",
@@ -29,7 +31,8 @@
           "w": 1400,
           "d": 700,
           "h": 720,
-          "color": "#93c5fd"
+          "color": "#93c5fd",
+          "shape": "desk"
         },
         {
           "id": "ky-is-1600-700",
@@ -37,7 +40,8 @@
           "w": 1600,
           "d": 700,
           "h": 720,
-          "color": "#93c5fd"
+          "color": "#93c5fd",
+          "shape": "desk"
         },
         {
           "id": "ky-is-1200-600",
@@ -45,7 +49,8 @@
           "w": 1200,
           "d": 600,
           "h": 720,
-          "color": "#93c5fd"
+          "color": "#93c5fd",
+          "shape": "desk"
         },
         {
           "id": "ky-is-1400-600",
@@ -53,7 +58,8 @@
           "w": 1400,
           "d": 600,
           "h": 720,
-          "color": "#93c5fd"
+          "color": "#93c5fd",
+          "shape": "desk"
         },
         {
           "id": "ky-is-1400-750",
@@ -61,7 +67,8 @@
           "w": 1400,
           "d": 750,
           "h": 720,
-          "color": "#93c5fd"
+          "color": "#93c5fd",
+          "shape": "desk"
         },
         {
           "id": "ky-is-1side-1200",
@@ -69,7 +76,8 @@
           "w": 1200,
           "d": 700,
           "h": 720,
-          "color": "#93c5fd"
+          "color": "#93c5fd",
+          "shape": "desk_side"
         },
         {
           "id": "ky-is-1side-1400",
@@ -77,7 +85,8 @@
           "w": 1400,
           "d": 700,
           "h": 720,
-          "color": "#93c5fd"
+          "color": "#93c5fd",
+          "shape": "desk_side"
         },
         {
           "id": "ky-is-2side-1400",
@@ -85,7 +94,8 @@
           "w": 1400,
           "d": 700,
           "h": 720,
-          "color": "#93c5fd"
+          "color": "#93c5fd",
+          "shape": "desk_both"
         },
         {
           "id": "ky-edia-swing-1050",
@@ -93,7 +103,8 @@
           "w": 900,
           "d": 450,
           "h": 1050,
-          "color": "#fcd34d"
+          "color": "#fcd34d",
+          "shape": "cabinet_swing"
         },
         {
           "id": "ky-edia-slide-1050",
@@ -101,7 +112,8 @@
           "w": 900,
           "d": 450,
           "h": 1050,
-          "color": "#fcd34d"
+          "color": "#fcd34d",
+          "shape": "cabinet_slide"
         },
         {
           "id": "ky-edia-lat3-1050",
@@ -109,7 +121,8 @@
           "w": 900,
           "d": 450,
           "h": 1050,
-          "color": "#fcd34d"
+          "color": "#fcd34d",
+          "shape": "cabinet"
         },
         {
           "id": "ky-edia-lat3-1185",
@@ -117,7 +130,8 @@
           "w": 900,
           "d": 450,
           "h": 1185,
-          "color": "#fcd34d"
+          "color": "#fcd34d",
+          "shape": "cabinet"
         },
         {
           "id": "ky-edia-open-1752",
@@ -125,7 +139,8 @@
           "w": 900,
           "d": 450,
           "h": 1752,
-          "color": "#fcd34d"
+          "color": "#fcd34d",
+          "shape": "shelf_open"
         },
         {
           "id": "ky-edia-locker6",
@@ -133,7 +148,9 @@
           "w": 900,
           "d": 450,
           "h": 1752,
-          "color": "#fcd34d"
+          "color": "#fcd34d",
+          "shape": "locker",
+          "n": 6
         },
         {
           "id": "ky-mitra2",
@@ -164,42 +181,48 @@
           "name": "平机 1000×700",
           "w": 1000,
           "d": 700,
-          "h": 700
+          "h": 700,
+          "shape": "desk"
         },
         {
           "id": "desk-1200",
           "name": "平机 1200×700",
           "w": 1200,
           "d": 700,
-          "h": 700
+          "h": 700,
+          "shape": "desk"
         },
         {
           "id": "desk-1400",
           "name": "平机 1400×700",
           "w": 1400,
           "d": 700,
-          "h": 700
+          "h": 700,
+          "shape": "desk"
         },
         {
           "id": "desk-1600",
           "name": "平机 1600×700",
           "w": 1600,
           "d": 700,
-          "h": 700
+          "h": 700,
+          "shape": "desk"
         },
         {
           "id": "desk-1side-1200",
           "name": "片袖机 1200×700",
           "w": 1200,
           "d": 700,
-          "h": 700
+          "h": 700,
+          "shape": "desk_side"
         },
         {
           "id": "desk-2side-1400",
           "name": "両袖机 1400×700",
           "w": 1400,
           "d": 700,
-          "h": 700
+          "h": 700,
+          "shape": "desk_both"
         },
         {
           "id": "desk-l-1600",
@@ -214,28 +237,32 @@
           "name": "昇降デスク 1200×700",
           "w": 1200,
           "d": 700,
-          "h": 720
+          "h": 720,
+          "shape": "desk"
         },
         {
           "id": "desk-free-1800",
           "name": "フリーアドレス 1800×1400",
           "w": 1800,
           "d": 1400,
-          "h": 720
+          "h": 720,
+          "shape": "table"
         },
         {
           "id": "desk-free-2400",
           "name": "フリーアドレス 2400×1200",
           "w": 2400,
           "d": 1200,
-          "h": 720
+          "h": 720,
+          "shape": "table"
         },
         {
           "id": "desk-counter-1800",
           "name": "カウンター 1800×450",
           "w": 1800,
           "d": 450,
-          "h": 1000
+          "h": 1000,
+          "shape": "desk"
         }
       ]
     },
@@ -302,63 +329,74 @@
           "name": "書庫 両開き 900×450",
           "w": 900,
           "d": 450,
-          "h": 1050
+          "h": 1050,
+          "shape": "cabinet_swing"
         },
         {
           "id": "cab-slide-900",
           "name": "書庫 引違い 900×450",
           "w": 900,
           "d": 450,
-          "h": 750
+          "h": 750,
+          "shape": "cabinet_slide"
         },
         {
           "id": "cab-lateral-3",
           "name": "ラテラル3段 900×450",
           "w": 900,
           "d": 450,
-          "h": 1050
+          "h": 1050,
+          "shape": "cabinet"
         },
         {
           "id": "cab-open-900",
           "name": "オープン書庫 900×450",
           "w": 900,
           "d": 450,
-          "h": 1790
+          "h": 1790,
+          "shape": "shelf_open"
         },
         {
           "id": "locker-3",
           "name": "ロッカー 3人用",
           "w": 900,
           "d": 515,
-          "h": 1790
+          "h": 1790,
+          "shape": "locker",
+          "n": 3
         },
         {
           "id": "locker-6",
           "name": "ロッカー 6人用",
           "w": 900,
           "d": 515,
-          "h": 1790
+          "h": 1790,
+          "shape": "locker",
+          "n": 6
         },
         {
           "id": "wagon-3",
           "name": "ワゴン 3段",
           "w": 400,
           "d": 600,
-          "h": 600
+          "h": 600,
+          "shape": "cabinet"
         },
         {
           "id": "safe",
           "name": "金庫",
           "w": 550,
           "d": 600,
-          "h": 700
+          "h": 700,
+          "shape": "rect"
         },
         {
           "id": "shelf-light",
           "name": "軽量棚 1800×450",
           "w": 1800,
           "d": 450,
-          "h": 1800
+          "h": 1800,
+          "shape": "shelf_open"
         }
       ]
     },
@@ -371,21 +409,24 @@
           "name": "会議テーブル 1500×750",
           "w": 1500,
           "d": 750,
-          "h": 700
+          "h": 700,
+          "shape": "table"
         },
         {
           "id": "mtg-1800",
           "name": "会議テーブル 1800×900",
           "w": 1800,
           "d": 900,
-          "h": 700
+          "h": 700,
+          "shape": "table"
         },
         {
           "id": "mtg-2100",
           "name": "会議テーブル 2100×900",
           "w": 2100,
           "d": 900,
-          "h": 700
+          "h": 700,
+          "shape": "table"
         },
         {
           "id": "mtg-boat-2400",
@@ -409,7 +450,7 @@
           "w": 900,
           "d": 900,
           "h": 700,
-          "shape": "ellipse"
+          "shape": "round_table"
         },
         {
           "id": "mtg-round-1200",
@@ -417,21 +458,23 @@
           "w": 1200,
           "d": 1200,
           "h": 700,
-          "shape": "ellipse"
+          "shape": "round_table"
         },
         {
           "id": "center-table",
           "name": "センターテーブル 1200×600",
           "w": 1200,
           "d": 600,
-          "h": 400
+          "h": 400,
+          "shape": "table"
         },
         {
           "id": "side-table",
           "name": "サイドテーブル 500×500",
           "w": 500,
           "d": 500,
-          "h": 500
+          "h": 500,
+          "shape": "table"
         }
       ]
     },
@@ -444,70 +487,80 @@
           "name": "複合機",
           "w": 700,
           "d": 700,
-          "h": 1200
+          "h": 1200,
+          "shape": "rect"
         },
         {
           "id": "printer",
           "name": "プリンタ",
           "w": 500,
           "d": 450,
-          "h": 350
+          "h": 350,
+          "shape": "rect"
         },
         {
           "id": "shredder",
           "name": "シュレッダー",
           "w": 400,
           "d": 350,
-          "h": 650
+          "h": 650,
+          "shape": "rect"
         },
         {
           "id": "fridge",
           "name": "冷蔵庫",
           "w": 600,
           "d": 650,
-          "h": 1500
+          "h": 1500,
+          "shape": "rect"
         },
         {
           "id": "water",
           "name": "ウォーターサーバー",
           "w": 350,
           "d": 350,
-          "h": 1000
+          "h": 1000,
+          "shape": "rect"
         },
         {
           "id": "whiteboard",
           "name": "ホワイトボード 1800",
           "w": 1800,
           "d": 600,
-          "h": 1800
+          "h": 1800,
+          "shape": "rect"
         },
         {
           "id": "partition-1200",
           "name": "パーティション 1200",
           "w": 1200,
           "d": 50,
-          "h": 1200
+          "h": 1200,
+          "shape": "rect"
         },
         {
           "id": "partition-900",
           "name": "パーティション 900",
           "w": 900,
           "d": 50,
-          "h": 1200
+          "h": 1200,
+          "shape": "rect"
         },
         {
           "id": "booth",
           "name": "個室ブース 1200×1200",
           "w": 1200,
           "d": 1200,
-          "h": 2200
+          "h": 2200,
+          "shape": "rect"
         },
         {
           "id": "umbrella",
           "name": "傘立て",
           "w": 350,
           "d": 250,
-          "h": 500
+          "h": 500,
+          "shape": "rect"
         },
         {
           "id": "plant",
@@ -532,7 +585,8 @@
           "h": 0,
           "color": "#9ca3af",
           "kind": "obstacle",
-          "tool": "wall"
+          "tool": "wall",
+          "shape": "rect"
         },
         {
           "id": "obs-wall-2000",
@@ -541,7 +595,8 @@
           "d": 100,
           "h": 0,
           "color": "#9ca3af",
-          "kind": "obstacle"
+          "kind": "obstacle",
+          "shape": "rect"
         },
         {
           "id": "obs-wall-4000",
@@ -550,7 +605,8 @@
           "d": 100,
           "h": 0,
           "color": "#9ca3af",
-          "kind": "obstacle"
+          "kind": "obstacle",
+          "shape": "rect"
         },
         {
           "id": "obs-col-600",
@@ -559,7 +615,8 @@
           "d": 600,
           "h": 0,
           "color": "#9ca3af",
-          "kind": "obstacle"
+          "kind": "obstacle",
+          "shape": "rect"
         },
         {
           "id": "obs-col-800",
@@ -568,7 +625,8 @@
           "d": 800,
           "h": 0,
           "color": "#9ca3af",
-          "kind": "obstacle"
+          "kind": "obstacle",
+          "shape": "rect"
         },
         {
           "id": "obs-pillar-round",
@@ -588,7 +646,7 @@
           "h": 0,
           "color": "#9ca3af",
           "kind": "obstacle",
-          "shape": "ellipse"
+          "shape": "door"
         }
       ]
     },
@@ -601,7 +659,9 @@
           "name": "矩形",
           "w": 1000,
           "d": 1000,
-          "h": 0
+          "h": 0,
+          "shape": "rect",
+          "kind": "zone"
         },
         {
           "id": "shape-ellipse",
@@ -609,14 +669,17 @@
           "w": 1000,
           "d": 1000,
           "h": 0,
-          "shape": "ellipse"
+          "shape": "ellipse",
+          "kind": "zone"
         },
         {
           "id": "shape-aisle",
           "name": "通路帯 3000×1200",
           "w": 3000,
           "d": 1200,
-          "h": 0
+          "h": 0,
+          "shape": "rect",
+          "kind": "zone"
         }
       ]
     }

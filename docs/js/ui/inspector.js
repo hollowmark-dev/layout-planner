@@ -117,7 +117,25 @@ function renderSettings(root) {
   root.append(
     toggle('什器に寸法を表示する', 'showItemDims', true),
     toggle('レイヤーの色で表示する', 'colorByLayer'),
+    toggle('什器に種別の色を薄く敷く', 'itemTint'),
   );
+  // 図面を薄くする度合い（0 = そのまま、0.8 = かなり薄い）
+  const fade = el('input', { type: 'range', min: 0, max: 0.8, step: 0.05 });
+  fade.value = st.drawingFade ?? 0.45;
+  fade.addEventListener('input', () => {
+    st.drawingFade = Number(fade.value);
+    touch(['settings:changed']);
+  });
+  root.append(el('label', { class: 'field' }, ['図面を薄く表示', fade]));
+
+  // 什器の塗りの濃さ。0 にすると什器が透けて、下の図面を確かめられる
+  const solid = el('input', { type: 'range', min: 0, max: 0.95, step: 0.05 });
+  solid.value = st.itemFillOpacity ?? 0.85;
+  solid.addEventListener('input', () => {
+    st.itemFillOpacity = Number(solid.value);
+    touch(['items:changed']);
+  });
+  root.append(el('label', { class: 'field' }, ['什器の塗りの濃さ', solid]));
 
   // グリッドの原点。図面の左上のままだと通り芯とずれる
   const org = st.gridOrigin || { x: 0, y: 0 };

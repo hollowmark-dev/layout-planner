@@ -75,6 +75,9 @@ export function newProject(name = '無題のレイアウト') {
       ignoreChairOverlap: true,
       wallThicknessMm: 100,
       gridOrigin: { x: 0, y: 0 },
+      drawingFade: 0.45,      // 下地の図面を薄くする度合い（CADの外部参照フェード相当）
+      itemFillOpacity: 0.85,  // 什器の塗り。0 で完全に透過し下地が見える
+      itemTint: false,        // 種別の色を薄く敷くか（既定は線だけのモノクロ）
     },
   };
 }
